@@ -74,7 +74,7 @@
  * instantiations = उदाहरणीकरणगण
  * interface = अंतराफलक
  * interfaces = अंतराफलकगण
- * inherit =
+ * inherit = 
  * inheritance = वरासत
  * inherited = वरासित
  * library = संग्रह
@@ -1788,25 +1788,6 @@ class TranslatorHindi : public TranslatorAdapter_1_9_4
         sdate += stime;
       }
       return sdate;
-    }
-    virtual QCString trDayOfWeek(int dayOfWeek, bool, bool full)
-    {
-      static const char *days_short[]   = { "सोम.", "मंगल.", "बुध.", "गुरु.", "शुक्र.", "शनि.", "रवि." };
-      static const char *days_full[]    = { "सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार", "रविवार" };
-      QCString text  = full? days_full[dayOfWeek-1] : days_short[dayOfWeek-1];
-      return text;
-    }
-    virtual QCString trMonth(int month, bool, bool full)
-    {
-      static const char *months_short[] = { "जनवरी", "फरवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितम्बर", "अक्तूबर", "नवम्बर", "दिसम्बर" };
-      static const char *months_full[]  = { "जनवरी", "फरवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितम्बर", "अक्तूबर", "नवम्बर", "दिसम्बर" };
-      QCString text  = full? months_full[month-1] : months_short[month-1];
-      return text;
-    }
-    virtual QCString trDayPeriod(int period)
-    {
-      static const char *dayPeriod[] = { "am", "pm" };
-      return dayPeriod[period];
     }
 
 //////////////////////////////////////////////////////////////////////////

@@ -90,7 +90,7 @@ struct vhdlcodeYY_state
 
   CodeOutputInterface * code = 0;
   const char *  inputString = 0;     //!< the code fragment as text
-  int           inputPosition = 0;   //!< read offset during parsing
+  yy_size_t     inputPosition = 0;   //!< read offset during parsing
   QCString      fileName;
   int           inputLines = 0;      //!< number of line in the code fragment
   int           yyLineNr = 0;        //!< current line number
@@ -138,7 +138,7 @@ static void appStringLower(QCString& qcs,const char* text);
 static void codifyMapLines(yyscan_t yyscanner,const QCString &text);
 static void writeFuncProto(yyscan_t yyscanner);
 static void writeProcessProto(yyscan_t yyscanner);
-static int yyread(yyscan_t yyscanner,char *buf,int max_size);
+static yy_size_t yyread(yyscan_t yyscanner,char *buf,yy_size_t max_size);
 
 #if USE_STATE2STRING
 static const char *stateToString(int state);
@@ -921,12 +921,12 @@ XILINX      "INST"|"NET"|"PIN"|"BLKNM"|"BUFG"|"COLLAPSE"|"CPLD"|"COMPGRP"|"CONFI
 /*@ ----------------------------------------------------------------------------
  */
 
-static int yyread(yyscan_t yyscanner,char *buf,int max_size)
+static yy_size_t yyread(yyscan_t yyscanner,char *buf,yy_size_t max_size)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  int inputPosition = yyextra->inputPosition;
+  yy_size_t inputPosition = yyextra->inputPosition;
   const char *s = yyextra->inputString + inputPosition;
-  int c=0;
+  yy_size_t c=0;
   while( c < max_size && *s)
   {
     *buf++ = *s++;

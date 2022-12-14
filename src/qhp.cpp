@@ -187,9 +187,13 @@ static QCString makeRef(const QCString & withoutExtension, const QCString & anch
   return result+"#"+anchor;
 }
 
-Qhp::Qhp() : p(std::make_unique<Private>()) {}
-Qhp::~Qhp() = default;
-Qhp::Qhp(Qhp &&) = default;
+Qhp::Qhp() : p(std::make_unique<Private>())
+{
+}
+
+Qhp::~Qhp()
+{
+}
 
 void Qhp::initialize()
 {

@@ -282,8 +282,6 @@ PageDef *addRelatedPage(const QCString &name,
                         SrcLangExt lang=SrcLangExt_Unknown
                        );
 
-bool getCaseSenseNames();
-
 QCString escapeCharsInString(const QCString &name,bool allowDots,bool allowUnderscore=FALSE);
 QCString unescapeCharsInString(const QCString &s);
 
@@ -316,20 +314,7 @@ QCString stripExtension(const QCString &fName);
 
 void replaceNamespaceAliases(QCString &scope,int i);
 
-//! Return the index of the last :: in the string \a name that is still before the first <
-inline int computeQualifiedIndex(const QCString &name)
-{
-  int l = static_cast<int>(name.length());
-  int lastSepPos = -1;
-  const char *p = name.data();
-  for (int i=0;i<l-1;i++)
-  {
-    char c=*p++;
-    if (c==':' && *p==':') lastSepPos=i;
-    if (c=='<') break;
-  }
-  return lastSepPos;
-}
+int computeQualifiedIndex(const QCString &name);
 
 void addDirPrefix(QCString &fileName);
 
@@ -357,7 +342,7 @@ bool checkIfTypedef(const Definition *scope,const FileDef *fileScope,const QCStr
 
 QCString parseCommentAsText(const Definition *scope,const MemberDef *member,const QCString &doc,const QCString &fileName,int lineNr);
 
-QCString transcodeCharacterStringToUTF8(const QCString &inputEncoding,const QCString &input);
+QCString transcodeCharacterStringToUTF8(const QCString &input);
 
 QCString recodeString(const QCString &str,const char *fromEncoding,const char *toEncoding);
 
@@ -444,7 +429,5 @@ FortranFormat convertFileNameFortranParserCode(QCString fn);
 
 QCString integerToAlpha(int n, bool upper=true);
 QCString integerToRoman(int n, bool upper=true);
-
-QCString getEncoding(const FileInfo &fi);
 
 #endif

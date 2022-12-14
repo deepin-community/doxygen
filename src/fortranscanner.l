@@ -74,6 +74,7 @@ typedef yyguts_t *yyscan_t;
 #include "debug.h"
 #include "markdown.h"
 
+const int fixedCommentAfter = 72;
 
 // Toggle for some debugging info
 //#define DBG_CTX(x) fprintf x
@@ -204,10 +205,6 @@ struct fortranscannerYY_state
 //! Holds program scope->symbol name->symbol modifiers.
   std::map<Entry*,std::map<std::string,SymbolModifiers> > modifiers;
   int                      anonCount    = 0 ;
-
-  int fixedCommentAfter = 72;
-  //! counter for the number of main programs in this file
-  int mainPrograms      = 0; 
 };
 
 //-----------------------------------------------------------------------------
@@ -217,7 +214,7 @@ static QCString extractFromParens(const QCString &name);
 static QCString extractBind(const QCString &name);
 
 
-static int yyread(yyscan_t yyscanner,char *buf,int max_size);
+static yy_size_t yyread(yyscan_t yyscanner,char *buf,yy_size_t max_size);
 static void startCommentBlock(yyscan_t yyscanner,bool);
 static void handleCommentBlock(yyscan_t yyscanner,const QCString &doc,bool brief);
 static void subrHandleCommentBlock(yyscan_t yyscanner,const QCString &doc,bool brief);
@@ -228,7 +225,6 @@ static void addSubprogram(yyscan_t yyscanner,const QCString &text);
 static void addInterface(yyscan_t yyscanner,QCString name, InterfaceType type);
 static Argument *getParameter(yyscan_t yyscanner,const QCString &name);
 static void scanner_abort(yyscan_t yyscanner);
-static inline void pop_state(yyscan_t yyscanner);
 
 static void startScope(yyscan_t yyscanner,Entry *scope);
 static bool endScope(yyscan_t yyscanner,Entry *scope, bool isGlobalRoot=FALSE);
@@ -252,8 +248,6 @@ static inline const char *getLexerFILE() {return __FILE__;}
 #include "doxygen_lex.h"
 #define YY_USER_ACTION yyextra->colNr+=(int)yyleng;
 #define INVALID_ENTRY ((Entry*)0x8)
-
-
 //-----------------------------------------------------------------------------
 
 %}
@@ -265,7 +259,6 @@ NOTIDSYM  [^a-z_A-Z0-9]
 SEPARATE  [:, \t]
 ID        [a-z_A-Z%]+{IDSYM}*
 ID_       [a-z_A-Z%]*{IDSYM}*
-OPERATOR_ID (operator{BS}"("{BS}(\.[a-z_A-Z]+\.|"="|"/="|"//"|"=="|"<"|"<="|">"|">="|"+"|"*"|"**"|"/"|"-"){BS}")")
 PP_ID     {ID}
 LABELID   [a-z_A-Z]+[a-z_A-Z0-9\-]*
 SUBPROG   (subroutine|function)
@@ -292,7 +285,7 @@ ATTR_SPEC (EXTERNAL|ALLOCATABLE|DIMENSION{ARGS}|{INTENT_SPEC}|INTRINSIC|OPTIONAL
 ACCESS_SPEC (PRIVATE|PUBLIC)
 LANGUAGE_BIND_SPEC BIND{BS}"("{BS}C{BS}((,{BS}NAME{BS}"="{BS}"\""(.*)"\""{BS})|(,{BS}NAME{BS}"="{BS}"'"(.*)"'"{BS}))?")"
 /* Assume that attribute statements are almost the same as attributes. */
-ATTR_STMT {ATTR_SPEC}|DIMENSION
+ATTR_STMT {ATTR_SPEC}|DIMENSION|{ACCESS_SPEC}
 EXTERNAL_STMT (EXTERNAL)
 
 CONTAINS  CONTAINS
@@ -379,7 +372,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                                //printf("BUFFER:%s\n", (const char*)yyextra->inputStringPrepass);
                                                pushBuffer(yyscanner,yyextra->inputStringPrepass);
                                                yyextra->colNr = 0;
-                                               pop_state(yyscanner);
+                                               yy_pop_state(yyscanner);
                                              }
                                              else
                                              { // simple line
@@ -420,7 +413,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                           {
                                             yyextra->initializer+=yytext;
                                           }
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 <String>.                               { if (yy_top_state(yyscanner) == Initialization ||
                                               yy_top_state(yyscanner) == ArrayInitializer)
@@ -459,7 +452,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                             DBG_CTX((stderr,"start comment %d\n",yyextra->lineNr));
                                            }
                                         }
-<StrIgnore>.?/\n                        { pop_state(yyscanner); // comment ends with endline character
+<StrIgnore>.?/\n                        { yy_pop_state(yyscanner); // comment ends with endline character
                                           DBG_CTX((stderr,"end comment %d %s\n",yyextra->lineNr,qPrint(yyextra->debugStr)));
                                         } // comment line ends
 <StrIgnore>.                            { yyextra->debugStr+=yytext; }
@@ -483,7 +476,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                           yyextra->current->section=Entry::USINGDIR_SEC;
                                           yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
                                           yyextra->current->lang = SrcLangExt_Fortran;
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 <Use>{ID}/,                             {
                                           yyextra->useModuleName=yytext;
@@ -503,7 +496,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
 <Use,UseOnly>"\n"                       {
                                           yyextra->colNr -= 1;
                                           unput(*yytext);
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 
  /* INTERFACE definitions */
@@ -544,26 +537,25 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                             yyterminate();
                                           }
                                           yyextra->ifType = IF_NONE;
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 <InterfaceBody>module{BS}procedure      { yy_push_state(YY_START,yyscanner);
                                           BEGIN(ModuleProcedure);
                                         }
-<ModuleProcedure>{ID}                   { QCString name = QCString(yytext).lower();
-                                          if (yyextra->ifType == IF_ABSTRACT || yyextra->ifType == IF_SPECIFIC)
+<ModuleProcedure>{ID}                   { if (yyextra->ifType == IF_ABSTRACT || yyextra->ifType == IF_SPECIFIC)
                                           {
-                                            addInterface(yyscanner,name, yyextra->ifType);
+                                            addInterface(yyscanner,yytext, yyextra->ifType);
                                             startScope(yyscanner,yyextra->last_entry.get());
                                           }
 
                                           yyextra->current->section = Entry::FUNCTION_SEC ;
-                                          yyextra->current->name = name; 
+                                          yyextra->current->name = yytext;
                                           yyextra->moduleProcedures.push_back(yyextra->current);
                                           addCurrentEntry(yyscanner,true);
                                         }
 <ModuleProcedure>"\n"                   { yyextra->colNr -= 1;
                                           unput(*yytext);
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 <InterfaceBody>.                        {}
 
@@ -601,7 +593,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                           //if (!endScope(yyscanner,yyextra->current_root))
                                           //  yyterminate();
                                           yyextra->defaultProtection = Public;
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 <Start,ModuleBody,ModuleBodyContains>"end"({BS}(module|program)({BS_}{ID})?)?{BS}/(\n|!|;) { // end module
                                           resolveModuleProcedures(yyscanner,yyextra->current_root);
@@ -618,7 +610,7 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                             }
                                             else
                                             {
-                                              pop_state(yyscanner); // cannot pop artrificial entry
+                                              yy_pop_state(yyscanner); // cannot pop artrificial entry
                                             }
                                           }
                                           else
@@ -638,14 +630,12 @@ SCOPENAME ({ID}{BS}"::"{BS})*
 
   /*------- access specification --------------------------------------------------------------------------*/
 
-<ModuleBody,TypedefBody,TypedefBodyContains>private/{BS}(\n|"!") {
-                                           yyextra->defaultProtection = Private;
-                                           yyextra->current->protection = yyextra->defaultProtection ;
-                                         }
-<ModuleBody,TypedefBody,TypedefBodyContains>public/{BS}(\n|"!")  {
-                                           yyextra->defaultProtection = Public;
-                                           yyextra->current->protection = yyextra->defaultProtection ;
-                                         }
+<ModuleBody>private/{BS}(\n|"!")        { yyextra->defaultProtection = Private;
+                                          yyextra->current->protection = yyextra->defaultProtection ;
+                                        }
+<ModuleBody>public/{BS}(\n|"!")         { yyextra->defaultProtection = Public;
+                                          yyextra->current->protection = yyextra->defaultProtection ;
+                                        }
 
  /*------- type definition  -------------------------------------------------------------------------------*/
 
@@ -658,8 +648,8 @@ SCOPENAME ({ID}{BS}"::"{BS})*
                                           }
 
                                           yy_push_state(Typedef,yyscanner);
-                                          yyextra->current->protection = Package; // invalid in Fortran, replaced below
-                                          yyextra->typeProtection = Public;
+                                          yyextra->current->protection = yyextra->defaultProtection;
+                                          yyextra->typeProtection = yyextra->defaultProtection;
                                           yyextra->typeMode = true;
                                         }
 <Typedef>{
@@ -676,9 +666,11 @@ extends{ARGS}                           {
                                         }
 public                                  {
                                           yyextra->current->protection = Public;
+                                          yyextra->typeProtection = Public;
                                         }
 private                                 {
                                           yyextra->current->protection = Private;
+                                          yyextra->typeProtection = Private;
                                         }
 {LANGUAGE_BIND_SPEC}                    {
                                           /* ignored for now */
@@ -697,20 +689,6 @@ private                                 {
                                                yyextra->current_root->section == Entry::NAMESPACE_SEC))
                                           {
                                             yyextra->current->name = yyextra->current_root->name + "::" + yyextra->current->name;
-                                          }
-
-                                          // set modifiers to allow adjusting public/private in surrounding module scope
-                                          if( yyextra->current->protection == Package )
-                                          {
-                                            yyextra->current->protection = yyextra->defaultProtection;
-                                          }
-                                          else if( yyextra->current->protection == Public )
-                                          {
-                                            yyextra->modifiers[yyextra->current_root][yyextra->current->name.lower().str()] |= QCString("public");
-                                          }
-                                          else if( yyextra->current->protection == Private )
-                                          {
-                                            yyextra->modifiers[yyextra->current_root][yyextra->current->name.lower().str()] |= QCString("private");
                                           }
 
                                           addCurrentEntry(yyscanner,true);
@@ -767,7 +745,7 @@ private                                 {
                                             yyterminate();
                                           }
                                           yyextra->typeMode = false;
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 ^{BS}"end"{BS}/(\n|!|;) { /* incorrect end type definition */
                                           warn(yyextra->fileName,yyextra->lineNr, "Found 'END' instead of 'END TYPE'");
@@ -777,7 +755,7 @@ private                                 {
                                             yyterminate();
                                           }
                                           yyextra->typeMode = false;
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 }
 
@@ -802,7 +780,7 @@ private                                 {
                                            }
                                            yyextra->subrCurrent.pop_back();
                                            yyextra->vtype = V_IGNORE;
-                                           pop_state(yyscanner) ;
+                                           yy_pop_state(yyscanner) ;
                                         }
 <BlockData>{
 {ID}                                    {
@@ -845,30 +823,13 @@ private                                 {
 {ATTR_STMT}/{BS}"::"                    {
                                           /* attribute statement starts */
                                           DBG_CTX((stderr,"5=========> Attribute statement: %s\n", yytext));
-                                          if (YY_START == Start)
-                                          {
-                                            addModule(yyscanner);
-                                            yy_push_state(ModuleBody,yyscanner); //anon program
-                                          }
                                           QCString tmp = yytext;
                                           yyextra->currentModifiers |= tmp.stripWhiteSpace();
                                           yyextra->argType="";
                                           yy_push_state(YY_START,yyscanner);
                                           BEGIN( AttributeList ) ;
                                         }
-"common"                                {
-                                          if (YY_START == Start)
-                                          {
-                                            addModule(yyscanner);
-                                            yy_push_state(ModuleBody,yyscanner); //anon program
-                                          }
-                                        }
 {ID}                                    {
-                                          if (YY_START == Start)
-                                          {
-                                            addModule(yyscanner);
-                                            yy_push_state(ModuleBody,yyscanner); //anon program
-                                          }
                                         }
 ^{BS}"type"{BS_}"is"/{BT_}              {}
 ^{BS}"type"{BS}"="                      {}
@@ -910,36 +871,11 @@ private                                 {
 }
 
 <Variable>{BS}                          {}
-<Variable>{OPERATOR_ID}                 { /* parse operator access statements "public :: operator(==)" */
-                                          QCString name = QCString(yytext).stripWhiteSpace().lower();
-                                          /* if variable/type/etc is part of a module, mod name is necessary for output */
-                                          // get surrounding state
-                                          int currentState = YY_START;
-                                          pop_state(yyscanner);
-                                          int outerState = YY_START;
-                                          yy_push_state(currentState,yyscanner);
-                                          if( outerState == Start || outerState == ModuleBody )
-                                          {
-                                            if ((yyextra->current_root) && 
-                                                (yyextra->current_root->section == Entry::CLASS_SEC
-                                                 || yyextra->current_root->section == Entry::NAMESPACE_SEC))
-                                            {
-                                              name = yyextra->current_root->name + "::" + name;
-                                            }
-                                          }
-                                          /* remember attributes for the symbol */
-                                          yyextra->modifiers[yyextra->current_root][name.str()] |= yyextra->currentModifiers;
-                                        }
 <Variable>{ID}                          { /* parse variable declaration */
                                           //cout << "5=========> got variable: " << yyextra->argType << "::" << yytext << endl;
                                           /* work around for bug in QCString.replace (QCString works) */
                                           QCString name=yytext;
                                           name = name.lower();
-                                          /* if variable/type/etc is part of a module, mod name is necessary for output */
-                                          if ((yyextra->current_root) && yyextra->current_root->section == Entry::NAMESPACE_SEC)
-                                          {
-                                            name = yyextra->current_root->name + "::" + name;
-                                          }
                                           /* remember attributes for the symbol */
                                           yyextra->modifiers[yyextra->current_root][name.lower().str()] |= yyextra->currentModifiers;
                                           yyextra->argName= name;
@@ -1056,12 +992,12 @@ private                                 {
                                           BEGIN(Initialization);
                                         }
 <Variable>"\n"                          { yyextra->currentModifiers = SymbolModifiers();
-                                          pop_state(yyscanner); // end variable declaration list
+                                          yy_pop_state(yyscanner); // end variable declaration list
                                           newLine(yyscanner);
                                           yyextra->docBlock.resize(0);
                                         }
 <Variable>";".*"\n"                     { yyextra->currentModifiers = SymbolModifiers();
-                                          pop_state(yyscanner); // end variable declaration list
+                                          yy_pop_state(yyscanner); // end variable declaration list
                                           yyextra->docBlock.resize(0);
                                           yyextra->inputStringSemi = " \n"+QCString(yytext+1);
                                           yyextra->lineNr--;
@@ -1100,7 +1036,7 @@ private                                 {
 <Initialization>{COMMA}                 { if (yyextra->initializerScope == 0)
                                           {
                                             updateVariablePrepassComment(yyscanner,yyextra->colNr-(int)yyleng, yyextra->colNr);
-                                            pop_state(yyscanner); // end initialization
+                                            yy_pop_state(yyscanner); // end initialization
                                             if (yyextra->last_enum)
                                             {
                                               yyextra->last_enum->initializer.str(yyextra->initializer.str());
@@ -1116,7 +1052,7 @@ private                                 {
                                           }
                                         }
 <Initialization>"\n"|"!"                { //|
-                                          pop_state(yyscanner); // end initialization
+                                          yy_pop_state(yyscanner); // end initialization
                                           if (yyextra->last_enum)
                                           {
                                             yyextra->last_enum->initializer.str(yyextra->initializer.str());
@@ -1169,7 +1105,7 @@ private                                 {
                                             yyterminate();
                                           }
                                           yyextra->typeMode = false;
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
  /*------ fortran subroutine/function handling ------------------------------------------------------------*/
  /*       Start is initial condition                                                                       */
@@ -1217,20 +1153,12 @@ private                                 {
 <Subprog>{BS}                           {   /* ignore white space */   }
 <Subprog>{ID}                           { yyextra->current->name = yytext;
                                           //cout << "1a==========> got " << yyextra->current->type << " " << yytext << " " << yyextra->lineNr << endl;
-                                          QCString returnName = yyextra->current->name.lower();
-                                          /* if type is part of a module, mod name is necessary for output */
-                                          if ((yyextra->current_root) && 
-                                              (yyextra->current_root->section ==  Entry::CLASS_SEC ||
-                                               yyextra->current_root->section ==  Entry::NAMESPACE_SEC)) 
-                                          {
-                                            yyextra->current->name= yyextra->current_root->name + "::" + yyextra->current->name;
-                                          }
-                                          yyextra->modifiers[yyextra->current_root][yyextra->current->name.lower().str()].returnName = returnName;
+                                          yyextra->modifiers[yyextra->current_root][yyextra->current->name.lower().str()].returnName = yyextra->current->name.lower();
 
                                           if (yyextra->ifType == IF_ABSTRACT || yyextra->ifType == IF_SPECIFIC)
                                           {
                                             yyextra->current_root->name = substitute(
-                                                yyextra->current_root->name, "$interface$", QCString(yytext).lower());
+                                                yyextra->current_root->name, "$interface$", yytext);
                                           }
 
                                           BEGIN(Parameterlist);
@@ -1255,12 +1183,11 @@ private                                 {
                                         }
 <Parameterlist>{ID}                     {
                                           //yyextra->current->type not yet available
-                                          QCString param = QCString(yytext).lower();
+                                          QCString param = yytext;
                                           // std::cout << "3=========> got parameter " << param << "\n";
                                           yyextra->current->args += param;
                                           Argument arg;
                                           arg.name = param;
-                                          arg.type = "";
                                           yyextra->current->argList.push_back(arg);
                                         }
 <Parameterlist>{NOARGS}                 {
@@ -1346,7 +1273,7 @@ private                                 {
                                           {
                                             subrHandleCommentBlockResult(yyscanner,yyextra->docBlock,TRUE);
                                           }
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                           yyextra->docBlock.resize(0);
                                         }
 
@@ -1374,7 +1301,7 @@ private                                 {
                                           yyextra->colNr -= 1;
                                           unput(*yytext);
                                           handleCommentBlock(yyscanner,yyextra->docBlock,TRUE);
-                                          pop_state(yyscanner);
+                                          yy_pop_state(yyscanner);
                                         }
 
  /*-----Prototype parsing -------------------------------------------------------------------------*/
@@ -1589,7 +1516,7 @@ static void insertCharacter(char *contents, int length, int pos, char c)
 
 /* change yyextra->comments and bring line continuation character to previous line */
 /* also used to set continuation marks in case of fortran code usage, done here as it is quite complicated code */
-const char* prepassFixedForm(const char* contents, int *hasContLine,int fixedCommentAfter)
+const char* prepassFixedForm(const char* contents, int *hasContLine)
 {
   int column=0;
   int prevLineLength=0;
@@ -1608,11 +1535,9 @@ const char* prepassFixedForm(const char* contents, int *hasContLine,int fixedCom
   int newContentsSize = (int)strlen(contents)+3; // \000, \n (when necessary) and one spare character (to avoid reallocation)
   char* newContents = (char*)malloc(newContentsSize);
   int curLine = 1;
-  size_t sizCont;
 
   int j = -1;
-  sizCont = strlen(contents);
-  for(size_t i=0;i<sizCont;i++) {
+  for(int i=0;;i++) {
     column++;
     char c = contents[i];
     if (artificialComment && c != '\n')
@@ -1826,23 +1751,13 @@ const char* prepassFixedForm(const char* contents, int *hasContLine,int fixedCom
     free(newContents);
     return NULL;
   }
-
-  if (j==-1) // contents was empty
+  newContentsSize = (int)strlen(newContents);
+  if (newContents[newContentsSize - 1] != '\n')
   {
-    newContents = (char*)realloc(newContents, 2);
-    newContents[0] = '\n';
-    newContents[1] = '\000';
-  }
-  else if (newContents[j] == '\n') // content ended with newline
-  {
-    newContents = (char*)realloc(newContents, j+2);
-    newContents[j + 1] = '\000';
-  }
-  else // content did not end with a newline
-  {
-    newContents = (char*)realloc(newContents, j+3);
-    newContents[j + 1] = '\n';
-    newContents[j + 2] = '\000';
+    // to be on the safe side
+    newContents = (char*)realloc(newContents, newContentsSize+2);
+    newContents[newContentsSize] = '\n';
+    newContents[newContentsSize + 1] = '\000';
   }
   return newContents;
 }
@@ -1892,37 +1807,16 @@ static void copyEntry(std::shared_ptr<Entry> dest, const std::shared_ptr<Entry> 
 void resolveModuleProcedures(yyscan_t yyscanner,Entry *current_root)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  if (yyextra->moduleProcedures.empty()) return;
- 
-  // build up map of available functions
-  std::map<std::string,std::shared_ptr<Entry>> procMap;
+  for (const auto &ce1 : yyextra->moduleProcedures)
   {
-    for (const auto& cf: current_root->children())
+    // check all entries in this module
+    for (const auto &ce2 : current_root->children())
     {
-      if (cf->section != Entry::FUNCTION_SEC)
-        continue;
-
-      // remove scope from name
-      QCString name = cf->name;
+      if (ce1->name == ce2->name)
       {
-        int end = name.findRev(":");
-        if (end != -1) 
-          name.remove(0, end+1);
+        copyEntry(ce1, ce2);
       }
-
-      procMap.insert(std::make_pair(name.str(), cf));
-    }
-  }
-
-
-  // for all module procedures
-  for (const auto& ce1: yyextra->moduleProcedures)
-  {
-    if (procMap.find(ce1->name.str())!=procMap.end())
-    {
-      std::shared_ptr<Entry> proc = procMap[ce1->name.str()];
-      copyEntry(ce1, proc);
-    }
+    } // for procedures in yyextra->current module
   } // for all interface module procedures
   yyextra->moduleProcedures.clear();
 }
@@ -2276,10 +2170,6 @@ static void startScope(yyscan_t yyscanner,Entry *scope)
   yyextra->current_root= scope; /* start substructure */
 
   yyextra->modifiers.insert(std::make_pair(scope, std::map<std::string,SymbolModifiers>()));
-
-  // create new current with possibly different defaults...
-  yyextra->current = std::make_shared<Entry>();
-  initEntry(yyscanner);
 }
 
 /*! Ends scope in fortran program: may update subprogram arguments or module variable attributes.
@@ -2309,10 +2199,6 @@ static bool endScope(yyscan_t yyscanner,Entry *scope, bool isGlobalRoot)
     return FALSE;
   }
 
-  // create new current with possibly different defaults...
-  yyextra->current = std::make_shared<Entry>();
-  initEntry(yyscanner);
-
   // update variables or subprogram arguments with yyextra->modifiers
   std::map<std::string,SymbolModifiers>& mdfsMap = yyextra->modifiers[scope];
 
@@ -2340,46 +2226,38 @@ static bool endScope(yyscan_t yyscanner,Entry *scope, bool isGlobalRoot)
     }
 
   }
-  if (scope->section == Entry::CLASS_SEC && scope->spec & Entry::Interface) 
+  if (scope->section == Entry::CLASS_SEC)
   { // was INTERFACE_SEC
-    if (scope->parent() && scope->parent()->section == Entry::FUNCTION_SEC) 
+    if (scope->parent()->section == Entry::FUNCTION_SEC)
     { // interface within function
       // iterate functions of interface and
       // try to find types for dummy(ie. argument) procedures.
       //cout<<"Search in "<<scope->name<<endl;
+      int count = 0;
+      int found = FALSE;
       for (const auto &ce : scope->children())
       {
+        count++;
         if (ce->section != Entry::FUNCTION_SEC)
           continue;
 
-        // remove prefix
-        QCString name = ce->name.lower();
-        int ii = name.findRev(":");
-        if (ii != -1)
-          name.remove(0, ii+1);
-        Argument *arg = findArgument(scope->parent(), name);
-        if (arg != 0) 
+        Argument *arg = findArgument(scope->parent(), ce->name, TRUE);
+        if (arg != 0)
         {
           // set type of dummy procedure argument to interface
-          arg->type = "external " + ce->type + "(";
-          for (unsigned int i=0; i<ce->argList.size(); i++)
-          {
-            if (i > 0)
-            {
-              arg->type = arg->type + ", ";
-            }
-            const Argument &subarg = ce->argList.at(i);
-            arg->type = arg->type + subarg.type + " " + subarg.name;
-          }
-          arg->type = arg->type + ")";
-          arg->name = name;
+          arg->name = arg->type;
+          arg->type = scope->name;
         }
+        if (ce->name.lower() == scope->name.lower()) found = TRUE;
       }
-      // clear all yyextra->modifiers of the scope
-      yyextra->modifiers.erase(scope);
-      scope->parent()->removeSubEntry(scope);
-      scope = 0;
-      return TRUE;
+      if ((count == 1) && found)
+      {
+        // clear all yyextra->modifiers of the scope
+        yyextra->modifiers.erase(scope);
+        scope->parent()->removeSubEntry(scope);
+        scope = 0;
+        return TRUE;
+      }
     }
   }
   if (scope->section!=Entry::FUNCTION_SEC)
@@ -2387,20 +2265,12 @@ static bool endScope(yyscan_t yyscanner,Entry *scope, bool isGlobalRoot)
     // iterate variables: get and apply yyextra->modifiers
     for (const auto &ce : scope->children())
     {
-      if (ce->section != Entry::VARIABLE_SEC && ce->section != Entry::FUNCTION_SEC && ce->section != Entry::CLASS_SEC && ce->section != Entry::FUNCTION_SEC)
+      if (ce->section != Entry::VARIABLE_SEC && ce->section != Entry::FUNCTION_SEC)
         continue;
 
       //cout<<ce->name<<", "<<mdfsMap.contains(ce->name.lower())<<mdfsMap.count()<<endl;
       if (mdfsMap.find(ce->name.lower().str())!=mdfsMap.end())
         applyModifiers(ce.get(), mdfsMap[ce->name.lower().str()]);
-
-      // remove prefix for variable names
-      if (ce->section == Entry::VARIABLE_SEC || ce->section == Entry::FUNCTION_SEC)
-      {
-        int end = ce->name.findRev(":");
-        if (end != -1) 
-          ce->name.remove(0, end+1);
-      }
     }
   }
 
@@ -2410,10 +2280,10 @@ static bool endScope(yyscan_t yyscanner,Entry *scope, bool isGlobalRoot)
   return TRUE;
 }
 
-static int yyread(yyscan_t yyscanner,char *buf,int max_size)
+static yy_size_t yyread(yyscan_t yyscanner,char *buf,yy_size_t max_size)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  int c=0;
+  yy_size_t c=0;
   while ( c < max_size && yyextra->inputString[yyextra->inputPosition] )
   {
     *buf = yyextra->inputString[yyextra->inputPosition++] ;
@@ -2434,14 +2304,6 @@ static void initEntry(yyscan_t yyscanner)
   if (yyextra->typeMode)
   {
     yyextra->current->protection = yyextra->typeProtection;
-  }
-  else if (yyextra->current_root && yyextra->current_root->section == Entry::CLASS_SEC && yyextra->current_root->spec & Entry::Interface)
-  {
-    yyextra->current->protection = Public;
-  }
-  else if (yyextra->current_root && yyextra->current_root->section == Entry::FUNCTION_SEC)
-  {
-    yyextra->current->protection = Private;
   }
   else
   {
@@ -2486,10 +2348,8 @@ static void addModule(yyscan_t yyscanner,const QCString &name, bool isModule)
     QCString fname = yyextra->fileName;
     int index = std::max(fname.findRev('/'), fname.findRev('\\'));
     fname = fname.right(fname.length()-index-1);
-    if (yyextra->mainPrograms) fname += "__" + QCString().setNum(yyextra->mainPrograms);
-    yyextra->mainPrograms++;
     fname = fname.prepend("__").append("__");
-    yyextra->current->name = substitute(fname, ".", "_");
+    yyextra->current->name = fname;
   }
   yyextra->current->type = "program";
   yyextra->current->fileName  = yyextra->fileName;
@@ -2511,10 +2371,6 @@ static void addSubprogram(yyscan_t yyscanner,const QCString &text)
   yyextra->functionLine = (subtype.find("function") != -1);
   yyextra->current->type += " " + subtype;
   yyextra->current->type = yyextra->current->type.stripWhiteSpace();
-  if (yyextra->ifType == IF_ABSTRACT)
-  {
-    yyextra->current->virt = Virtual;
-  }
   yyextra->current->fileName  = yyextra->fileName;
   yyextra->current->bodyLine  = yyextra->lineNr; // used for source reference start of body of routine
   yyextra->current->startLine  = yyextra->lineNr; // used for source reference start of definition
@@ -2809,14 +2665,13 @@ static void parseMain(yyscan_t yyscanner, const QCString &fileName,const char *f
 
   if (yyextra->isFixedForm)
   {
-    yyextra->fixedCommentAfter = Config_getInt(FORTRAN_COMMENT_AFTER);
     msg("Prepassing fixed form of %s\n", qPrint(fileName));
     //printf("---strlen=%d\n", strlen(fileBuf));
     //clock_t start=clock();
 
     //printf("Input fixed form string:\n%s\n", fileBuf);
     //printf("===========================\n");
-    yyextra->inputString = prepassFixedForm(fileBuf, nullptr,yyextra->fixedCommentAfter);
+    yyextra->inputString = prepassFixedForm(fileBuf, nullptr);
     Debug::print(Debug::FortranFixed2Free,0,"======== Fixed to Free format  =========\n---- Input fixed form string ------- \n%s\n", fileBuf);
     Debug::print(Debug::FortranFixed2Free,0,"---- Resulting free form string ------- \n%s\n", yyextra->inputString);
     //printf("Resulting free form string:\n%s\n", yyextra->inputString);
@@ -2967,14 +2822,6 @@ static void scanner_abort(yyscan_t yyscanner)
   //exit(-1);
 }
 
-static inline void pop_state(yyscan_t yyscanner)
-{
-  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  if ( yyg->yy_start_stack_ptr <= 0 )
-    warn(yyextra->fileName,yyextra->lineNr,"Unexpected statement '%s'",yytext );
-  else
-    yy_pop_state(yyscanner);
-}
 //----------------------------------------------------------------------------
 
 #include "fortranscanner.l.h"

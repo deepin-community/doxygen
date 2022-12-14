@@ -335,7 +335,7 @@ DB_GEN_C
   }
   pageName = fileName;
   relPath = relativePathToRoot(fileName);
-  if (!fileName.endsWith(".xml")) fileName+=".xml";
+  if (fileName.right(4)!=".xml") fileName+=".xml";
   startPlainFile(fileName);
   m_codeGen.setRelativePath(relPath);
   m_codeGen.setSourceFileName(stripPath(fileName));
@@ -761,12 +761,12 @@ DB_GEN_C
 void DocbookGenerator::writeNonBreakableSpace(int n)
 {
 DB_GEN_C
-  for (int i=0;i<n;i++) m_t << "&#160;";
+  for (int i=0;i<n;i++) m_t << " ";
 }
 void DocbookGenerator::lineBreak(const QCString &)
 {
 DB_GEN_C
-  m_t << "<?linebreak?>";
+  m_t << "\n";
 }
 void DocbookGenerator::startTypewriter()
 {

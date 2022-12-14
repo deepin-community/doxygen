@@ -59,7 +59,7 @@ class MemberGroup
                const Definition *container,bool showEnumValues,bool showInline) const;
     void writeDocumentationPage(OutputList &ol,const QCString &scopeName,
                const DefinitionMutable *container) const;
-    void writeTagFile(TextStream &,bool qualifiedName=false);
+    void writeTagFile(TextStream &);
     void addGroupedInheritedMembers(OutputList &ol,const ClassDef *cd,
                MemberListType lt,
                const ClassDef *inheritedFrom,const QCString &inheritId) const;
@@ -78,7 +78,6 @@ class MemberGroup
     int numDocMembers() const;
     int numDocEnumValues() const;
     const Definition *container() const;
-    const Definition *memberContainer() const;
 
     int countInheritableMembers(const ClassDef *inheritedFrom) const;
     void addListReferences(Definition *d);

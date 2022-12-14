@@ -17,6 +17,8 @@
  *
  */
 
+#include <chrono>
+#include <ctime>
 #include <stdlib.h>
 
 #include "rtfgen.h"
@@ -46,14 +48,17 @@
 #include "dir.h"
 #include "utf8.h"
 #include "debug.h"
-#include "datetime.h"
+
 
 //#define DBG_RTF(x) x;
 #define DBG_RTF(x)
 
 static QCString dateToRTFDateString()
 {
-  auto tm = getCurrentDateTime();
+  auto now = std::chrono::system_clock::now();
+  auto time = std::chrono::system_clock::to_time_t(now);
+  auto tm = *localtime(&time);
+
   QCString result;
   result.sprintf("\\yr%d\\mo%d\\dy%d\\hr%d\\min%d\\sec%d",
       tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
@@ -369,7 +374,7 @@ void RTFGenerator::startFile(const QCString &name,const QCString &,const QCStrin
   QCString fileName=name;
   m_relPath = relativePathToRoot(fileName);
 
-  if (!fileName.endsWith(".rtf")) fileName+=".rtf";
+  if (fileName.right(4)!=".rtf" ) fileName+=".rtf";
   startPlainFile(fileName);
   setRelativePath(m_relPath);
   setSourceFileName(stripPath(fileName));

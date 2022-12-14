@@ -216,14 +216,16 @@ class ClassDef : public Definition
      */
     virtual FileDef      *getFileDef() const = 0;
 
-    /** Returns the member with the given name */
+    /** Returns the Java package this class is in or 0 if not applicable.
+     */
+
     virtual const MemberDef *getMemberByName(const QCString &) const = 0;
 
     /** Returns TRUE iff \a bcd is a direct or indirect base class of this
      *  class. This function will recursively traverse all branches of the
      *  inheritance tree.
      */
-    virtual int isBaseClass(const ClassDef *bcd,bool followInstances) const = 0;
+    virtual bool isBaseClass(const ClassDef *bcd,bool followInstances,int level=0) const = 0;
 
     /** Returns TRUE iff \a bcd is a direct or indirect sub class of this
      *  class.

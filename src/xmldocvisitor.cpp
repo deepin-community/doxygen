@@ -294,6 +294,12 @@ void XmlDocVisitor::operator()(const DocStyleChange &s)
       break;
     case DocStyleChange::Div:  /* HTML only */ break;
     case DocStyleChange::Span: /* HTML only */ break;
+    case DocStyleChange::Details:
+      if (s.enable()) m_t << "<details>";  else m_t << "</details>";
+      break;
+    case DocStyleChange::Summary:
+      if (s.enable()) m_t << "<summary>";  else m_t << "</summary>";
+      break;
   }
 }
 
@@ -828,17 +834,17 @@ void XmlDocVisitor::operator()(const DocHtmlCell &c)
     }
     else if (opt.name=="class") // handle markdown generated attributes
     {
-      if (opt.value.startsWith("markdownTable")) // handle markdown generated attributes
+      if (opt.value.left(13)=="markdownTable") // handle markdown generated attributes
       {
-        if (opt.value.endsWith("Right"))
+        if (opt.value.right(5)=="Right")
         {
           m_t << " align='right'";
         }
-        else if (opt.value.endsWith("Left"))
+        else if (opt.value.right(4)=="Left")
         {
           m_t << " align='left'";
         }
-        else if (opt.value.endsWith("Center"))
+        else if (opt.value.right(6)=="Center")
         {
           m_t << " align='center'";
         }
@@ -884,27 +890,6 @@ void XmlDocVisitor::operator()(const DocHRef &href)
   m_t << "</ulink>";
 }
 
-void XmlDocVisitor::operator()(const DocHtmlSummary &s)
-{
-  if (m_hide) return;
-  m_t << "<summary>";
-  visitChildren(s);
-  m_t << "</summary>";
-}
-
-void XmlDocVisitor::operator()(const DocHtmlDetails &d)
-{
-  if (m_hide) return;
-  m_t << "<details>";
-  auto summary = d.summary();
-  if (summary)
-  {
-    std::visit(*this,*summary);
-  }
-  visitChildren(d);
-  m_t << "</details>";
-}
-
 void XmlDocVisitor::operator()(const DocHtmlHeader &header)
 {
   if (m_hide) return;
@@ -936,7 +921,7 @@ void XmlDocVisitor::operator()(const DocImage &img)
                 altValue, img.isInlineImage());
 
   // copy the image to the output dir
-  FileDef *fd = 0;
+  FileDef *fd;
   bool ambig;
   if (url.isEmpty() && (fd=findFileDef(Doxygen::imageNameLinkedMap,img.name(),ambig)))
   {

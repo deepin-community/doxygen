@@ -628,7 +628,7 @@ void MemberList::writeDeclarations(OutputList &ol,
         {
           //printf("Member group has docs!\n");
           ol.startMemberGroupDocs();
-          ol.generateDoc(mg->docFile(),mg->docLine(),mg->memberContainer(),0,mg->documentation()+"\n",FALSE,FALSE,
+          ol.generateDoc(mg->docFile(),mg->docLine(),ctx,0,mg->documentation()+"\n",FALSE,FALSE,
               QCString(),FALSE,FALSE,Config_getBool(MARKDOWN_SUPPORT));
           ol.endMemberGroupDocs();
         }
@@ -937,7 +937,7 @@ QCString MemberList::listTypeAsString(MemberListType type)
   return "";
 }
 
-void MemberList::writeTagFile(TextStream &tagFile,bool useQualifiedName)
+void MemberList::writeTagFile(TextStream &tagFile)
 {
   for (const auto &imd : m_members)
   {
@@ -946,7 +946,7 @@ void MemberList::writeTagFile(TextStream &tagFile,bool useQualifiedName)
     {
       if (md->getLanguage()!=SrcLangExt_VHDL)
       {
-        md->writeTagFile(tagFile,useQualifiedName);
+        md->writeTagFile(tagFile);
         if (md->memberType()==MemberType_Enumeration && !md->isStrong())
         {
           for (const auto &ivmd : md->enumFieldList())
@@ -954,7 +954,7 @@ void MemberList::writeTagFile(TextStream &tagFile,bool useQualifiedName)
             MemberDefMutable *vmd = toMemberDefMutable(ivmd);
             if (vmd)
             {
-              vmd->writeTagFile(tagFile,useQualifiedName);
+              vmd->writeTagFile(tagFile);
             }
           }
         }
@@ -967,7 +967,7 @@ void MemberList::writeTagFile(TextStream &tagFile,bool useQualifiedName)
   }
   for (const auto &mg : m_memberGroupRefList)
   {
-    mg->writeTagFile(tagFile,useQualifiedName);
+    mg->writeTagFile(tagFile);
   }
 }
 

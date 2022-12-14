@@ -310,11 +310,7 @@ static QCString escapeSpecialChars(const QCString &s)
                  break;
       case '\\': if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('\\'); break;
       case '@':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('@'); break;
-      // commented out next line due to regression when using % to suppress a link
-      //case '%':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('%'); break;
       case '#':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('#'); break;
-      case '$':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('$'); break;
-      case '&':  if (!insideQuote) { growBuf.addChar('\\'); } growBuf.addChar('&'); break;
       default:   growBuf.addChar(c); break;
     }
     pc=c;
@@ -436,10 +432,8 @@ QCString Markdown::isBlockCommand(const char *data,int offset,int size)
   {
     { "dot",         getEndBlock   },
     { "code",        getEndCode    },
-    { "icode",       getEndBlock   },
     { "msc",         getEndBlock   },
     { "verbatim",    getEndBlock   },
-    { "iverbatim",   getEndBlock   },
     { "iliteral",    getEndBlock   },
     { "latexonly",   getEndBlock   },
     { "htmlonly",    getEndBlock   },
@@ -2771,7 +2765,7 @@ int Markdown::writeCodeBlock(const char *data,int size,int refIndent)
   int i=0,end;
   //printf("writeCodeBlock: data={%s}\n",qPrint(QCString(data).left(size)));
   // no need for \ilinebr here as the previous line was empty and was skipped
-  m_out.addStr("@iverbatim\n");
+  m_out.addStr("@verbatim\n");
   int emptyLines=0;
   while (i<size)
   {
@@ -2805,7 +2799,7 @@ int Markdown::writeCodeBlock(const char *data,int size,int refIndent)
       break;
     }
   }
-  m_out.addStr("@endiverbatim\\ilinebr ");
+  m_out.addStr("@endverbatim\\ilinebr ");
   while (emptyLines>0) // write skipped empty lines
   {
     // add empty line
@@ -2905,13 +2899,13 @@ void Markdown::writeFencedCodeBlock(const char *data,const char *lng,
     blockStart--;
     blockEnd--;
   }
-  m_out.addStr("@icode");
+  m_out.addStr("@code");
   if (!lang.isEmpty())
   {
     m_out.addStr("{"+lang+"}");
   }
   addStrEscapeUtf8Nbsp(data+blockStart,blockEnd-blockStart);
-  m_out.addStr("@endicode");
+  m_out.addStr("@endcode");
 }
 
 QCString Markdown::processQuotations(const QCString &s,int refIndent)
@@ -3054,6 +3048,15 @@ QCString Markdown::processBlocks(const QCString &s,const int indent)
   int size = s.length();
   int i=0,end=0,pi=-1,ref,level;
   QCString id,link,title;
+
+  // get indent for the first line
+  end = i+1;
+  int sp=0;
+  while (end<=size && data[end-1]!='\n')
+  {
+    if (data[end-1]==' ') sp++;
+    end++;
+  }
 
 #if 0 // commented m_out, since starting with a comment block is probably a usage error
       // see also http://stackoverflow.com/q/20478611/784672

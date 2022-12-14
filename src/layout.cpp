@@ -139,11 +139,11 @@ QCString LayoutNavEntry::url() const
 {
   QCString url = baseFile().stripWhiteSpace();
   if ((kind()!=LayoutNavEntry::User && kind()!=LayoutNavEntry::UserGroup) ||
-      (kind()==LayoutNavEntry::UserGroup && url.startsWith("usergroup")))
+      (kind()==LayoutNavEntry::UserGroup && url.left(9)=="usergroup"))
   {
     url = addHtmlExtensionIfMissing(url);
   }
-  else if (url.startsWith("@ref ") || url.startsWith("\\ref "))
+  else if (url.left(5)=="@ref " || url.left(5)=="\\ref ")
   {
     const Definition *d = 0;
     QCString anchor;
@@ -343,14 +343,14 @@ class LayoutParser
         },
         { "classindex",
           LayoutNavEntry::ClassIndex,
-          fortranOpt ? theTranslator->trCompoundIndexFortran() : vhdlOpt ? theTranslator->trDesignUnitIndex() : theTranslator->trCompoundIndex(),
+          fortranOpt ? theTranslator->trDataTypes() : vhdlOpt ? theTranslator->trDesignUnits() : theTranslator->trCompoundIndex(),
           QCString(),
           QCString(),
           "classes"
         },
         { "classes",
           LayoutNavEntry::Classes,
-          fortranOpt ? theTranslator->trDataTypes() : vhdlOpt ? theTranslator->trDesignUnits() : theTranslator->trClasses(),
+          fortranOpt ? theTranslator->trCompoundListFortran() : vhdlOpt ? theTranslator->trDesignUnitList() : theTranslator->trClasses(),
           theTranslator->trCompoundList(),
           fortranOpt ? theTranslator->trCompoundListDescriptionFortran() : vhdlOpt ? theTranslator->trDesignUnitListDescription() : theTranslator->trCompoundListDescription(),
           "annotated"
@@ -503,13 +503,17 @@ class LayoutParser
           QCString()
         }
       };
+      LayoutNavEntry::Kind kind;
       // find type in the table
       int i=0;
       QCString type = XMLHandlers::value(attrib,"type");
       while (mapping[i].typeStr)
       {
         if (mapping[i].typeStr==type)
+        {
+          kind = mapping[i].kind;
           break;
+        }
         i++;
       }
       if (mapping[i].typeStr==0)
@@ -526,7 +530,6 @@ class LayoutParser
         m_invalidEntry=TRUE;
         return;
       }
-      LayoutNavEntry::Kind kind = mapping[i].kind;
       QCString baseFile = mapping[i].baseFile;
       QCString title = XMLHandlers::value(attrib,"title");
       bool isVisible = elemIsVisible(attrib) && parentIsVisible(m_rootNav);
@@ -1655,7 +1658,7 @@ QCString extractLanguageSpecificTitle(const QCString &input,SrcLangExt lang)
     e=input.find('|',s);
     i=input.find('=',s);
     assert(i>s);
-    SrcLangExt key= static_cast<SrcLangExt>(input.mid(s,i-s).toUInt());
+    size_t key=input.mid(s,i-s).toUInt();
     if (key==lang) // found matching key
     {
       if (e==-1) e=input.length();

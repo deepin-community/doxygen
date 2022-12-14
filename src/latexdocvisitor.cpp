@@ -378,6 +378,12 @@ void LatexDocVisitor::operator()(const DocStyleChange &s)
       break;
     case DocStyleChange::Div:  /* HTML only */ break;
     case DocStyleChange::Span: /* HTML only */ break;
+    case DocStyleChange::Details: /* emulation of the <details> tag */
+      if (!s.enable()) m_t << "\n\n";
+      break;
+    case DocStyleChange::Summary: /* emulation of the <summary> tag inside a <details> tag */
+      if (s.enable()) m_t << "{\\bfseries{";      else m_t << "}}";
+      break;
   }
 }
 
@@ -1406,35 +1412,6 @@ void LatexDocVisitor::operator()(const DocHRef &href)
   m_t << "}}";
 }
 
-void LatexDocVisitor::operator()(const DocHtmlSummary &d)
-{
-  if (m_hide) return;
-  m_t << "{\\bfseries{";
-  visitChildren(d);
-  m_t << "}}";
-}
-
-void LatexDocVisitor::operator()(const DocHtmlDetails &d)
-{
-  if (m_hide) return;
-  m_t << "\n\n";
-  auto summary = d.summary();
-  if (summary)
-  {
-    std::visit(*this,*summary);
-    m_t << "\\begin{adjustwidth}{1em}{0em}\n";
-  }
-  visitChildren(d);
-  if (summary)
-  {
-    m_t << "\\end{adjustwidth}\n";
-  }
-  else
-  {
-    m_t << "\n\n";
-  }
-}
-
 void LatexDocVisitor::operator()(const DocHtmlHeader &header)
 {
   if (m_hide) return;
@@ -1449,7 +1426,7 @@ void LatexDocVisitor::operator()(const DocImage &img)
   {
     if (m_hide) return;
     QCString gfxName = img.name();
-    if (gfxName.endsWith(".eps") || gfxName.endsWith(".pdf"))
+    if (gfxName.right(4)==".eps" || gfxName.right(4)==".pdf")
     {
       gfxName=gfxName.left(gfxName.length()-4);
     }

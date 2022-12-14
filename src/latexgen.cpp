@@ -337,7 +337,7 @@ static void writeLatexMakefile()
     }
     t << "\techo \"Rerunning latex....\"\n"
       << "\t$(LATEX_CMD) $(MANUAL_FILE).tex\n"
-      << "\tlatex_count=$(LATEX_COUNT) ; \\\n"
+      << "\tlatex_count=%(LATEX_COUNT) ; \\\n"
       << "\twhile egrep -s 'Rerun (LaTeX|to get cross-references right|to get bibliographical references right)' $(MANUAL_FILE).log && [ $$latex_count -gt 0 ] ;\\\n"
       << "\t    do \\\n"
       << "\t      echo \"Rerunning latex....\" ;\\\n"
@@ -565,7 +565,7 @@ void LatexGenerator::startFile(const QCString &name,const QCString &,const QCStr
 #endif
   QCString fileName=name;
   m_relPath = relativePathToRoot(fileName);
-  if (!fileName.endsWith(".tex") && !fileName.endsWith(".sty")) fileName+=".tex";
+  if (fileName.right(4)!=".tex" && fileName.right(4)!=".sty") fileName+=".tex";
   startPlainFile(fileName);
   m_codeGen.setRelativePath(m_relPath);
   m_codeGen.setSourceFileName(stripPath(fileName));
@@ -693,12 +693,10 @@ static QCString substituteLatexKeywords(const QCString &str,
     copyFile(formulaMacrofile,Config_getString(LATEX_OUTPUT) + "/" + stripMacroFile);
   }
 
-  QCString projectNumber = Config_getString(PROJECT_NUMBER);
-
   // first substitute generic keywords
   QCString result = substituteKeywords(str,title,
     convertToLaTeX(Config_getString(PROJECT_NAME)),
-    convertToLaTeX(projectNumber),
+    convertToLaTeX(Config_getString(PROJECT_NUMBER)),
         convertToLaTeX(Config_getString(PROJECT_BRIEF)));
 
   // additional LaTeX only keywords
@@ -728,7 +726,6 @@ static QCString substituteLatexKeywords(const QCString &str,
   result = selectBlock(result,"LATEX_BATCHMODE",latexBatchmode,OutputGenerator::Latex);
   result = selectBlock(result,"LATEX_FONTENC",!latexFontenc.isEmpty(),OutputGenerator::Latex);
   result = selectBlock(result,"FORMULA_MACROFILE",!formulaMacrofile.isEmpty(),OutputGenerator::Latex);
-  result = selectBlock(result,"PROJECT_NUMBER",!projectNumber.isEmpty(),OutputGenerator::Latex);
 
   result = removeEmptyLines(result);
 

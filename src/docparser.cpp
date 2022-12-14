@@ -36,7 +36,6 @@
 #include "portable.h"
 #include "printdocvisitor.h"
 #include "util.h"
-#include "indexlist.h"
 
 // debug off
 #define DBG(x) do {} while(0)
@@ -180,7 +179,7 @@ QCString DocParser::findAndCopyImage(const QCString &fileName, DocImage::Type ty
     }
 
     if (type==DocImage::Latex && Config_getBool(USE_PDFLATEX) &&
-	fd->name().endsWith(".eps")
+	fd->name().right(4)==".eps"
        )
     { // we have an .eps image in pdflatex mode => convert it to a pdf.
       QCString outputDir = Config_getString(LATEX_OUTPUT);
@@ -201,7 +200,7 @@ QCString DocParser::findAndCopyImage(const QCString &fileName, DocImage::Type ty
   else
   {
     result=fileName;
-    if (!result.startsWith("http:") && !result.startsWith("https:") && doWarn)
+    if (result.left(5)!="http:" && result.left(6)!="https:" && doWarn)
     {
       warn_doc_error(context.fileName,tokenizer.getLineNr(),
            "image file %s is not found in IMAGE_PATH: "
@@ -246,7 +245,7 @@ void DocParser::checkArgumentName()
       if (lang==SrcLangExt_Fortran) argName=argName.lower();
       argName=argName.stripWhiteSpace();
       //printf("argName='%s' aName=%s\n",qPrint(argName),qPrint(aName));
-      if (argName.endsWith("...")) argName=argName.left(argName.length()-3);
+      if (argName.right(3)=="...") argName=argName.left(argName.length()-3);
       if (aName==argName)
       {
 	context.paramsFound.insert(aName.str());
@@ -323,7 +322,7 @@ void DocParser::checkUnOrMultipleDocumentedParams()
         if (lang==SrcLangExt_Fortran) argName = argName.lower();
         argName=argName.stripWhiteSpace();
         QCString aName = argName;
-        if (argName.endsWith("...")) argName=argName.left(argName.length()-3);
+        if (argName.right(3)=="...") argName=argName.left(argName.length()-3);
         if (lang==SrcLangExt_Python && (argName=="self" || argName=="cls"))
         {
           // allow undocumented self / cls parameter for Python
@@ -369,17 +368,6 @@ void DocParser::checkUnOrMultipleDocumentedParams()
                             context.memberDef->docLine(),
                             "%s",
                             qPrint(substitute(errMsg,"%","%%")));
-      }
-    }
-    else
-    {
-      if (context.paramsFound.empty() && Config_getBool(WARN_IF_DOC_ERROR))
-      {
-        warn_doc_error(context.memberDef->docFile(),
-                       context.memberDef->docLine(),
-                       "%s",
-                       qPrint(context.memberDef->qualifiedName() +
-                              " has @param documentation sections but no arguments"));
       }
     }
   }
@@ -561,10 +549,6 @@ void DocParser::errorHandleDefaultToken(DocNodeVariant *parent,int tok,
     case TK_SYMBOL:
       warn_doc_error(context.fileName,tokenizer.getLineNr(),"Unsupported symbol %s found as part of a %s",
            qPrint(context.token->name), qPrint(txt));
-      break;
-    case TK_HTMLTAG:
-      warn_doc_error(context.fileName,tokenizer.getLineNr(),"Unsupported HTML tag <%s%s> found as part of a %s",
-           context.token->endTag ? "/" : "",qPrint(context.token->name), qPrint(txt));
       break;
     default:
       children.append<DocWord>(this,parent,context.token->name);
@@ -869,7 +853,7 @@ void DocParser::handleLinkedWord(DocNodeVariant *parent,DocNodeList &children,bo
   }
   else // normal non-linkable word
   {
-    if (context.token->name.startsWith("#") || context.token->name.startsWith("::"))
+    if (context.token->name.left(1)=="#" || context.token->name.left(2)=="::")
     {
       warn_doc_error(context.fileName,tokenizer.getLineNr(),"explicit link request to '%s' could not be resolved",qPrint(name));
       children.append<DocWord>(this,parent,context.token->name);
@@ -978,11 +962,6 @@ void DocParser::defaultHandleTitleAndSize(const int cmd, DocNodeVariant *parent,
       // special case: no title, but we do have a size indicator
       break;
     }
-    else if (tok==TK_HTMLTAG)
-    {
-      tokenizer.unputString(context.token->name);
-      break;
-    }
     if (!defaultHandleToken(parent,tok,children))
     {
       errorHandleDefaultToken(parent,tok,children,Mappers::cmdMapper->find(cmd));
@@ -995,7 +974,7 @@ void DocParser::defaultHandleTitleAndSize(const int cmd, DocNodeVariant *parent,
   }
   while (tok==TK_WHITESPACE || tok==TK_WORD) // there are values following the title
   {
-    if (tok==TK_WORD)
+    if(tok == TK_WORD)
     {
       if (context.token->name=="width=" || context.token->name=="height=")
       {
@@ -1013,7 +992,6 @@ void DocParser::defaultHandleTitleAndSize(const int cmd, DocNodeVariant *parent,
       }
       else
       {
-        tokenizer.unputString(context.token->name);
         warn_doc_error(context.fileName,tokenizer.getLineNr(),"Unknown option '%s' after \\%s command, expected 'width' or 'height'",
                        qPrint(context.token->name), qPrint(Mappers::cmdMapper->find(cmd)));
         break;
@@ -1021,17 +999,6 @@ void DocParser::defaultHandleTitleAndSize(const int cmd, DocNodeVariant *parent,
     }
 
     tok=tokenizer.lex();
-    // if we found something we did not expect, push it back to the stream
-    // so it can still be processed
-    if (tok==TK_COMMAND_AT || tok==TK_COMMAND_BS)
-    {
-      tokenizer.unputString(context.token->name);
-      tokenizer.unputString(tok==TK_COMMAND_AT ? "@" : "\\");
-    }
-    else if (tok==TK_SYMBOL || tok==TK_HTMLTAG)
-    {
-      tokenizer.unputString(context.token->name);
-    }
   }
   tokenizer.setStatePara();
 
@@ -1427,6 +1394,16 @@ reparsetoken:
               handleStyleLeave(parent,children,DocStyleChange::Ins,tokenName);
             }
             break;
+          case HTML_DETAILS:
+            if (!context.token->endTag)
+            {
+              handleStyleEnter(parent,children,DocStyleChange::Details,tokenName,&context.token->attribs);
+            }
+            else
+            {
+              handleStyleLeave(parent,children,DocStyleChange::Details,tokenName);
+            }
+            break;
           case HTML_CODE:
           case XML_C:
             if (!context.token->endTag)
@@ -1681,220 +1658,6 @@ void DocParser::readTextFileByName(const QCString &file,QCString &text)
 
 //---------------------------------------------------------------------------
 
-static QCString extractCopyDocId(const char *data, uint &j, uint len)
-{
-  uint s=j;
-  int round=0;
-  bool insideDQuote=FALSE;
-  bool insideSQuote=FALSE;
-  bool found=FALSE;
-  while (j<len && !found)
-  {
-    if (!insideSQuote && !insideDQuote)
-    {
-      switch (data[j])
-      {
-        case '(': round++; break;
-        case ')': round--; break;
-        case '"': insideDQuote=TRUE; break;
-        case '\'': insideSQuote=TRUE; break;
-        case ' ':  // fall through
-        case '\t': // fall through
-        case '\n':
-          found=(round==0);
-          break;
-      }
-    }
-    else if (insideSQuote) // look for single quote end
-    {
-      if (data[j]=='\'' && (j==0 || data[j]!='\\'))
-      {
-        insideSQuote=FALSE;
-      }
-    }
-    else if (insideDQuote) // look for double quote end
-    {
-      if (data[j]=='"' && (j==0 || data[j]!='\\'))
-      {
-        insideDQuote=FALSE;
-      }
-    }
-    if (!found) j++;
-  }
-  if (qstrncmp(data+j," const",6)==0)
-  {
-    j+=6;
-  }
-  else if (qstrncmp(data+j," volatile",9)==0)
-  {
-    j+=9;
-  }
-  uint e=j;
-  if (j>0 && data[j-1]=='.') { e--; } // do not include punctuation added by Definition::_setBriefDescription()
-  QCString id(data+s,e-s);
-  //printf("extractCopyDocId='%s' input='%s'\n",qPrint(id),&data[s]);
-  return id;
-}
-
-// macro to check if the input starts with a specific command.
-// note that data[i] should point to the start of the command (\ or @ character)
-// and the sizeof(str) returns the size of str including the '\0' terminator;
-// a fact we abuse to skip over the start of the command character.
-#define CHECK_FOR_COMMAND(str,action) \
-   do if ((i+sizeof(str)<len) && qstrncmp(data+i+1,str,sizeof(str)-1)==0) \
-   { j=i+sizeof(str); action; } while(0)
-
-static uint isCopyBriefOrDetailsCmd(const char *data, uint i,uint len,bool &brief)
-{
-  uint j=0;
-  if (i==0 || (data[i-1]!='@' && data[i-1]!='\\')) // not an escaped command
-  {
-    CHECK_FOR_COMMAND("copybrief",brief=TRUE);    // @copybrief or \copybrief
-    CHECK_FOR_COMMAND("copydetails",brief=FALSE); // @copydetails or \copydetails
-  }
-  return j;
-}
-
-static uint isVerbatimSection(const char *data,uint i,uint len,QCString &endMarker)
-{
-  uint j=0;
-  if (i==0 || (data[i-1]!='@' && data[i-1]!='\\')) // not an escaped command
-  {
-    CHECK_FOR_COMMAND("dot",endMarker="enddot");
-    CHECK_FOR_COMMAND("icode",endMarker="endicode");
-    CHECK_FOR_COMMAND("code",endMarker="endcode");
-    CHECK_FOR_COMMAND("msc",endMarker="endmsc");
-    CHECK_FOR_COMMAND("iverbatim",endMarker="endiverbatim");
-    CHECK_FOR_COMMAND("verbatim",endMarker="endverbatim");
-    CHECK_FOR_COMMAND("iliteral",endMarker="endiliteral");
-    CHECK_FOR_COMMAND("latexonly",endMarker="endlatexonly");
-    CHECK_FOR_COMMAND("htmlonly",endMarker="endhtmlonly");
-    CHECK_FOR_COMMAND("xmlonly",endMarker="endxmlonly");
-    CHECK_FOR_COMMAND("rtfonly",endMarker="endrtfonly");
-    CHECK_FOR_COMMAND("manonly",endMarker="endmanonly");
-    CHECK_FOR_COMMAND("docbookonly",endMarker="enddocbookonly");
-    CHECK_FOR_COMMAND("startuml",endMarker="enduml");
-  }
-  //printf("isVerbatimSection(%s)=%d)\n",qPrint(QCString(&data[i]).left(10)),j);
-  return j;
-}
-
-static uint skipToEndMarker(const char *data,uint i,uint len,const QCString &endMarker)
-{
-  while (i<len)
-  {
-    if ((data[i]=='@' || data[i]=='\\') &&  // start of command character
-        (i==0 || (data[i-1]!='@' && data[i-1]!='\\'))) // that is not escaped
-    {
-      if (i+endMarker.length()+1<=len && qstrncmp(data+i+1,endMarker.data(),endMarker.length())==0)
-      {
-        return i+endMarker.length()+1;
-      }
-    }
-    i++;
-  }
-  // oops no endmarker found...
-  return i<len ? i+1 : len;
-}
-
-
-QCString DocParser::processCopyDoc(const char *data,uint &len)
-{
-  //printf("processCopyDoc start '%s'\n",data);
-  GrowBuf buf;
-  uint i=0;
-  int lineNr = tokenizer.getLineNr();
-  while (i<len)
-  {
-    char c = data[i];
-    if (c=='@' || c=='\\') // look for a command
-    {
-      bool isBrief=TRUE;
-      uint j=isCopyBriefOrDetailsCmd(data,i,len,isBrief);
-      if (j>0)
-      {
-        // skip whitespace
-        while (j<len && (data[j]==' ' || data[j]=='\t')) j++;
-        // extract the argument
-        QCString id = extractCopyDocId(data,j,len);
-        const Definition *def = 0;
-        QCString doc,brief;
-        //printf("resolving docs='%s'\n",qPrint(id));
-        if (findDocsForMemberOrCompound(id,&doc,&brief,&def))
-        {
-          //printf("found it def=%p brief='%s' doc='%s' isBrief=%d\n",def,qPrint(brief),qPrint(doc),isBrief);
-          auto it = std::find(context.copyStack.begin(),context.copyStack.end(),def);
-          if (it==context.copyStack.end()) // definition not parsed earlier
-          {
-            QCString orgFileName = context.fileName;
-            context.copyStack.push_back(def);
-            if (isBrief)
-            {
-              buf.addStr(" \\ilinebr\\ifile \""+QCString(def->briefFile())+"\" ");
-              buf.addStr("\\iline "+QCString().setNum(def->briefLine())+" ");
-              uint l=static_cast<uint>(brief.length());
-              buf.addStr(processCopyDoc(brief.data(),l));
-            }
-            else
-            {
-              buf.addStr(" \\ilinebr\\ifile \""+QCString(def->docFile())+"\" ");
-              buf.addStr("\\iline "+QCString().setNum(def->docLine())+" ");
-              uint l=static_cast<uint>(doc.length());
-              buf.addStr(processCopyDoc(doc.data(),l));
-            }
-            context.copyStack.pop_back();
-            buf.addStr(" \\ilinebr\\ifile \""+context.fileName+"\" ");
-            buf.addStr("\\iline "+QCString().setNum(lineNr)+" ");
-          }
-          else
-          {
-            warn_doc_error(context.fileName,tokenizer.getLineNr(),
-	         "Found recursive @copy%s or @copydoc relation for argument '%s'.\n",
-                 isBrief?"brief":"details",qPrint(id));
-          }
-        }
-        else
-        {
-          warn_doc_error(context.fileName,tokenizer.getLineNr(),
-               "@copy%s or @copydoc target '%s' not found", isBrief?"brief":"details",
-               qPrint(id));
-        }
-        // skip over command
-        i=j;
-      }
-      else
-      {
-        QCString endMarker;
-        uint k = isVerbatimSection(data,i,len,endMarker);
-        if (k>0)
-        {
-          uint orgPos = i;
-          i=skipToEndMarker(data,k,len,endMarker);
-          buf.addStr(data+orgPos,i-orgPos);
-          // TODO: adjust lineNr
-        }
-        else
-        {
-          buf.addChar(c);
-          i++;
-        }
-      }
-    }
-    else // not a command, just copy
-    {
-      buf.addChar(c);
-      i++;
-      lineNr += (c=='\n') ? 1 : 0;
-    }
-  }
-  len = static_cast<uint>(buf.getPos());
-  buf.addChar(0);
-  return buf.get();
-}
-
-
-//---------------------------------------------------------------------------
-
 IDocNodeASTPtr validatingParseDoc(IDocParser &parserIntf,
                             const QCString &fileName,int startLine,
                             const Definition *ctx,const MemberDef *md,
@@ -2003,10 +1766,7 @@ IDocNodeASTPtr validatingParseDoc(IDocParser &parserIntf,
     std::visit(PrintDocVisitor{},ast->root);
   }
 
-  if (md && md->isFunction())
-  {
-    parser->checkUnOrMultipleDocumentedParams();
-  }
+  parser->checkUnOrMultipleDocumentedParams();
   if (parser->context.memberDef) parser->context.memberDef->detectUndocumentedParams(parser->context.hasParamCommand,parser->context.hasReturnCommand);
 
   // TODO: These should be called at the end of the program.

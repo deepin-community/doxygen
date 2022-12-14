@@ -606,9 +606,6 @@ class Translator
     virtual QCString trDateTime(int year,int month,int day,int dayOfWeek,
                                 int hour,int minutes,int seconds,
                                 bool includeTime) = 0;
-    virtual QCString trDayOfWeek(int dayOfWeek, bool first_capital, bool full) = 0;
-    virtual QCString trMonth(int month, bool first_capital, bool full) = 0;
-    virtual QCString trDayPeriod(int period) = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // new since 1.7.5
@@ -720,11 +717,6 @@ class Translator
 // new since 1.9.4
 //////////////////////////////////////////////////////////////////////////
     virtual QCString trPackageList() = 0;
-
-//////////////////////////////////////////////////////////////////////////
-// new since 1.9.6
-//////////////////////////////////////////////////////////////////////////
-    virtual QCString trFlowchart() = 0;
 };
 
 #endif

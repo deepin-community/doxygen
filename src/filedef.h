@@ -20,6 +20,7 @@
 
 #include <set>
 
+#include "index.h"
 #include "definition.h"
 #include "memberlist.h"
 #include "containers.h"

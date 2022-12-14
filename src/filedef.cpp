@@ -15,8 +15,6 @@
  *
  */
 
-#include <unordered_set>
-
 #include "memberlist.h"
 #include "classlist.h"
 #include "filedef.h"
@@ -319,7 +317,7 @@ void FileDefImpl::writeTagFile(TextStream &tagFile)
 {
   tagFile << "  <compound kind=\"file\">\n";
   tagFile << "    <name>" << convertToXML(name()) << "</name>\n";
-  tagFile << "    <path>" << convertToXML(stripFromPath(getPath())) << "</path>\n";
+  tagFile << "    <path>" << convertToXML(getPath()) << "</path>\n";
   tagFile << "    <filename>" << addHtmlExtensionIfMissing(getOutputFileBase()) << "</filename>\n";
   for (const auto &ii : m_includeList)
   {
@@ -1512,11 +1510,11 @@ void FileDefImpl::combineUsingRelations()
 
 bool FileDefImpl::isDocumentationFile() const
 {
-  static const std::unordered_set<std::string> docExtensions =
-  { "doc", "txt", "dox", "md", "markdown" };
-
-  int lastDot = name().findRev('.');
-  return (lastDot!=-1 && docExtensions.find(name().mid(lastDot+1).str())!=docExtensions.end()) ||
+  return name().right(4)==".doc" ||
+         name().right(4)==".txt" ||
+         name().right(4)==".dox" ||
+         name().right(3)==".md"  ||
+         name().right(9)==".markdown" ||
          getLanguageFromFileName(getFileNameExtension(name())) == SrcLangExt_Markdown;
 }
 
@@ -1524,7 +1522,7 @@ void FileDefImpl::acquireFileVersion()
 {
   QCString vercmd = Config_getString(FILE_VERSION_FILTER);
   if (!vercmd.isEmpty() && !m_filePath.isEmpty() &&
-      m_filePath!="generated" && m_filePath!="graph_legend.dox")
+      m_filePath!="generated" && m_filePath!="graph_legend")
   {
     msg("Version of %s : ",qPrint(m_filePath));
     QCString cmd = vercmd+" \""+m_filePath+"\"";

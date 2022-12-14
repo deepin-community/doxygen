@@ -14,7 +14,6 @@
 */
 
 #include <cassert>
-#include <cmath>
 
 #include "dotrunner.h"
 #include "util.h"
@@ -124,15 +123,12 @@ bool DotRunner::readBoundingBox(const QCString &fileName,int *width,int *height,
      if (p) // found PageBoundingBox or /MediaBox string
      {
        int x,y;
-       double w,h;
        fclose(f);
-       if (sscanf(p+bblen,"%d %d %lf %lf",&x,&y,&w,&h)!=4)
+       if (sscanf(p+bblen,"%d %d %d %d",&x,&y,width,height)!=4)
        {
          //printf("readBoundingBox sscanf fail\n");
          return FALSE;
        }
-       *width = static_cast<int>(std::ceil(w));
-       *height = static_cast<int>(std::ceil(h));
        return TRUE;
      }
   }
@@ -214,7 +210,7 @@ bool DotRunner::run()
   // As there should be only one pdf file be generated, we don't need code for regenerating multiple pdf files in one call
   for (auto& s : m_jobs)
   {
-    if (s.format.startsWith("pdf"))
+    if (s.format.left(3)=="pdf")
     {
       int width=0,height=0;
       if (!readBoundingBox(s.output,&width,&height,FALSE)) goto error;
@@ -226,7 +222,7 @@ bool DotRunner::run()
       }
     }
 
-    if (s.format.startsWith("png"))
+    if (s.format.left(3)=="png")
     {
       checkPngResult(s.output);
     }

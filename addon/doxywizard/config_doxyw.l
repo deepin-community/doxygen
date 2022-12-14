@@ -42,7 +42,6 @@
 
 #define MAX_INCLUDE_DEPTH 10
 
-#define USE_STATE2STRING 0
 
 /* -----------------------------------------------------------------
  *
@@ -80,16 +79,16 @@ static const char *stateToString(int state);
 #undef	YY_INPUT
 #define	YY_INPUT(buf,result,max_size) result=yyread(buf,max_size);
 
-static int yyread(char *buf,int maxSize)
+static yy_size_t yyread(char *buf,yy_size_t maxSize)
 {
     // no file included
     if (g_includeStack.isEmpty())
     {
-      return static_cast<int>(fread(buf,1,maxSize,g_file));
+      return fread(buf,1,maxSize,g_file);
     }
     else
     {
-      return static_cast<int>(fread(buf,1,maxSize,g_includeStack.top()->file));
+      return fread(buf,1,maxSize,g_includeStack.top()->file);
     }
 }
 
@@ -375,9 +374,6 @@ static void readIncludeFile(const QString &incName)
   }
 }
 
-#if USE_STATE2STRING
-static const char *stateToString(int state);
-#endif
 
 %}
 
@@ -836,6 +832,4 @@ void writeStringValue(QTextStream &t,TextCodecAdapter *codec,const QString &s)
     }
   }
 }
-#if USE_STATE2STRING
 #include "config_doxyw.l.h"
-#endif

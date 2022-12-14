@@ -3,12 +3,12 @@
 #include <iterator>
 #include <unordered_map>
 #include <string>
+
 #include <ctype.h>
+#include "md5.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-
-#include "md5.h"
 #include "regex.h"
 #include "config.h"
 #include "definitionimpl.h"
@@ -34,8 +34,6 @@
 #include "bufstr.h"
 #include "reflist.h"
 #include "utf8.h"
-#include "indexlist.h"
-#include "fileinfo.h"
 
 //-----------------------------------------------------------------------------------------
 
@@ -210,7 +208,6 @@ static void addToMap(const QCString &name,Definition *d)
   if (!vhdlOpt && index!=-1) symbolName=symbolName.mid(index+2);
   if (!symbolName.isEmpty())
   {
-    //printf("adding symbol %s\n",qPrint(symbolName));
     Doxygen::symbolMap->add(symbolName,d);
 
     d->_setSymbolName(symbolName);
@@ -373,10 +370,10 @@ void DefinitionImpl::addSectionsToIndex()
       }
       QCString title = si->title();
       if (title.isEmpty()) title = si->label();
-      // determine if there is a next level inside this item, but be aware of the anchor and table section references.
+      // determine if there is a next level inside this item
       auto it_next = std::next(it);
       bool isDir = (it_next!=m_impl->sectionRefs.end()) ?
-                       (isSection((*it_next)->type()) && static_cast<int>((*it_next)->type()) > nextLevel) : FALSE;
+                       (static_cast<int>((*it_next)->type()) > nextLevel) : FALSE;
       Doxygen::indexList->addContentsItem(isDir,title,
                                          getReference(),
                                          m_impl->def->getOutputFileBase(),
@@ -852,7 +849,7 @@ bool readCodeFragment(const QCString &fileName,
       Debug::print(Debug::FilterOutput,0,"-------------\n%s\n-------------\n",qPrint(result));
     }
   }
-  result = transcodeCharacterStringToUTF8(getEncoding(FileInfo(fileName.str())),result);
+  result = transcodeCharacterStringToUTF8(result);
   if (!result.isEmpty() && result.at(result.length()-1)!='\n') result += "\n";
   //printf("readCodeFragment(%d-%d)=%s\n",startLine,endLine,qPrint(result));
   return found;
@@ -1368,7 +1365,7 @@ QCString DefinitionImpl::navigationPathAsString() const
     else if (m_impl->def->definitionType()==Definition::TypeClass)
     {
       QCString name = locName;
-      if (name.endsWith("-p"))
+      if (name.right(2)=="-p" /*|| name.right(2)=="-g"*/)
       {
         name = name.left(name.length()-2);
       }
@@ -1568,12 +1565,12 @@ QCString DefinitionImpl::documentation() const
 
 int DefinitionImpl::docLine() const
 {
-  return m_impl->details ? m_impl->details->line : m_impl->brief ? m_impl->brief->line : 1;
+  return m_impl->details ? m_impl->details->line : 1;
 }
 
 QCString DefinitionImpl::docFile() const
 {
-  return m_impl->details ? m_impl->details->file : m_impl->brief ? m_impl->brief->file : QCString("<"+m_impl->name+">");
+  return m_impl->details ? m_impl->details->file : QCString("<"+m_impl->name+">");
 }
 
 //----------------------------------------------------------------------------

@@ -53,6 +53,6 @@ class FortranOutlineParserFixed : public FortranOutlineParser
     FortranOutlineParserFixed() : FortranOutlineParser(FortranFormat_Fixed) { }
 };
 
-const char* prepassFixedForm(const char* contents, int *hasContLine, int fixedCommentAfter);
+const char* prepassFixedForm(const char* contents, int *hasContLine);
 
 #endif

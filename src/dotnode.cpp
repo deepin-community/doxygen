@@ -34,7 +34,7 @@ struct EdgeProperties
 /*! mapping from protection levels to color names */
 static const char *normalEdgeColorMap[] =
 {
-  "steelblue1",    // Public
+  "midnightblue",  // Public
   "darkgreen",     // Protected
   "firebrick4",    // Private
   "darkorchid3",   // "use" relation
@@ -61,7 +61,7 @@ static const char *normalEdgeStyleMap[] =
 
 static const char *umlEdgeColorMap[] =
 {
-  "steelblue1",    // Public
+  "midnightblue",  // Public
   "darkgreen",     // Protected
   "firebrick4",    // Private
   "grey25",        // "use" relation
@@ -96,7 +96,7 @@ static EdgeProperties umlEdgeProps =
   umlEdgeColorMap, umlArrowStyleMap, umlEdgeStyleMap
 };
 
-QCString escapeTooltip(const QCString &tooltip)
+static QCString escapeTooltip(const QCString &tooltip)
 {
   if (tooltip.isEmpty()) return tooltip;
   QCString result;
@@ -354,14 +354,36 @@ void DotNode::deleteNodes(DotNode *node)
   }
 }
 
-void DotNode::writeLabel(TextStream &t, GraphType gt) const
+void DotNode::writeBox(TextStream &t,
+                       GraphType gt,
+                       GraphOutputFormat /*format*/,
+                       bool hasNonReachableChildren) const
 {
+  const char *labCol;
+  if (m_classDef)
+  {
+    if (m_classDef->hasDocumentation() && hasNonReachableChildren)
+      labCol = "red";
+    else if (m_classDef->hasDocumentation() && !hasNonReachableChildren)
+      labCol = "black";
+    else if (!m_classDef->hasDocumentation() && hasNonReachableChildren)
+      labCol = "orangered";
+    else // (!m_classDef->hasDocumentation() && !hasNonReachableChildren)
+    {
+      labCol = "grey75";
+      if (m_classDef->templateMaster() && m_classDef->templateMaster()->hasDocumentation())
+        labCol = "black";
+    }
+  }
+  else
+  {
+    labCol = m_url.isEmpty() ? "grey75" :  // non link
+    (hasNonReachableChildren ? "red" : "black");
+  }
+  t << "  Node" << m_number << " [label=\"";
+
   if (m_classDef && Config_getBool(UML_LOOK) && (gt==Inheritance || gt==Collaboration))
   {
-    // Set shape to the record-based type.
-    // Record-based shape represent recursive lists of fields, which are drawn as alternating horizontal and vertical rows of boxes. Special characters are: Literal braces, vertical bars and angle brackets.
-    // Only shape types: record and Mrecord support record-based label. See dot User's Manual, Ch. 21, p. 6.
-    t << "shape=record,label=";
     // add names shown as relations to a set, so we don't show
     // them as attributes as well
     StringUnorderedSet arrowNames;
@@ -385,7 +407,7 @@ void DotNode::writeLabel(TextStream &t, GraphType gt) const
     }
 
     //printf("DotNode::writeBox for %s\n",qPrint(m_classDef->name()));
-    t << "\"{" << convertLabel(m_label) << "\\n";
+    t << "{" << convertLabel(m_label) << "\\n";
     auto dotUmlDetails = Config_getEnum(DOT_UML_DETAILS);
     if (dotUmlDetails!=DOT_UML_DETAILS_t::NONE)
     {
@@ -428,93 +450,46 @@ void DotNode::writeLabel(TextStream &t, GraphType gt) const
         }
       }
     }
-    t << "}\"";
-  }
-  else if (Config_getString(DOT_NODE_ATTR).contains("shape=plain"))
-  {
-    t << "label=";
-    if (m_isRoot)
-      t << "<<b>" << convertToXML(m_label) << "</b>>";
-    else if (m_truncated == Truncated)
-      t << "<<i>" << convertToXML(m_label) << "</i>>";
-    else
-      t << '"' << convertLabel(m_label) << '"';
+    t << "}";
   }
   else // standard look
   {
-    t << "label=" << '"' << convertLabel(m_label) << '"';
+    t << convertLabel(m_label);
   }
-}
-
-void DotNode::writeUrl(TextStream &t) const
-{
-  if (m_url.isEmpty())
-    return;
-  int tagPos = m_url.findRev('$');
-  t << ",URL=\"";
-  QCString noTagURL = m_url;
-  if (tagPos!=-1)
-  {
-    t << m_url.left(tagPos);
-    noTagURL = m_url.mid(tagPos);
-  }
-  int anchorPos = noTagURL.findRev('#');
-  if (anchorPos==-1)
-  {
-    t << addHtmlExtensionIfMissing(noTagURL) << "\"";
-  }
-  else
-  {
-    t << addHtmlExtensionIfMissing(noTagURL.left(anchorPos))
-      << noTagURL.right(noTagURL.length() - anchorPos) << "\"";
-  }
-}
-
-void DotNode::writeBox(TextStream &t,
-                       GraphType gt,
-                       GraphOutputFormat /*format*/,
-                       bool hasNonReachableChildren) const
-{
-  const char *labCol;
-  const char *fillCol = "white";
-  if (m_classDef)
-  {
-    if (m_classDef->hasDocumentation() && hasNonReachableChildren)
-    {
-      labCol = "red";
-      fillCol = "#FFF0F0";
-    }
-    else if (m_classDef->hasDocumentation() && !hasNonReachableChildren)
-      labCol = "gray40";
-    else if (!m_classDef->hasDocumentation() && hasNonReachableChildren)
-      labCol = "orangered";
-    else // (!m_classDef->hasDocumentation() && !hasNonReachableChildren)
-    {
-      labCol = "grey75";
-      if (m_classDef->templateMaster() && m_classDef->templateMaster()->hasDocumentation())
-        labCol = "gray40";
-    }
-  }
-  else
-  {
-    labCol = m_url.isEmpty() ? "grey60" :  // non link
-    (hasNonReachableChildren ? "red" : "grey40");
-    fillCol = m_url.isEmpty() ? "#E0E0E0" :
-    (hasNonReachableChildren ? "#FFF0F0" : "white");
-  }
-  t << "  Node" << m_number << " [";
-  writeLabel(t,gt);
-  t << ",height=0.2,width=0.4";
+  t << "\",height=0.2,width=0.4";
   if (m_isRoot)
   {
-    t << ",color=\"gray40\", fillcolor=\"grey60\", style=\"filled\", fontcolor=\"black\"";
+    t << ",color=\"black\", fillcolor=\"grey75\", style=\"filled\", fontcolor=\"black\"";
   }
   else
   {
     t << ",color=\"" << labCol << "\"";
-    t << ", fillcolor=\"" << fillCol << "\"";
-    t << ", style=\"filled\"";
-    writeUrl(t);
+    if (!Config_getBool(DOT_TRANSPARENT))
+    {
+      t << ", fillcolor=\"white\"";
+      t << ", style=\"filled\"";
+    }
+    if (!m_url.isEmpty())
+    {
+      int tagPos = m_url.findRev('$');
+      t << ",URL=\"";
+      QCString noTagURL = m_url;
+      if (tagPos!=-1)
+      {
+        t << m_url.left(tagPos);
+        noTagURL = m_url.mid(tagPos);
+      }
+      int anchorPos = noTagURL.findRev('#');
+      if (anchorPos==-1)
+      {
+        t << addHtmlExtensionIfMissing(noTagURL) << "\"";
+      }
+      else
+      {
+        t << addHtmlExtensionIfMissing(noTagURL.left(anchorPos))
+          << noTagURL.right(noTagURL.length()-anchorPos) << "\"";
+      }
+    }
   }
   if (!m_tooltip.isEmpty())
   {
@@ -552,7 +527,8 @@ void DotNode::writeArrow(TextStream &t,
   bool umlUseArrow = aStyle=="odiamond";
 
   if (pointBack && !umlUseArrow) t << "dir=\"back\",";
-  t << "color=\"" << eProps->edgeColorMap[ei->color()] << "\",";
+  t << "color=\"" << eProps->edgeColorMap[ei->color()]
+    << "\",fontsize=\"" << Config_getInt(DOT_FONTSIZE) << "\",";
   t << "style=\"" << eProps->edgeStyleMap[ei->style()] << "\"";
   if (!ei->label().isEmpty())
   {
@@ -571,6 +547,7 @@ void DotNode::writeArrow(TextStream &t,
       t << ",arrowhead=\"" << eProps->arrowStyleMap[ei->color()] << "\"";
   }
 
+  if (format==GOF_BITMAP) t << ",fontname=\"" << Config_getString(DOT_FONTNAME) << "\"";
   t << "];\n";
 }
 

@@ -78,8 +78,6 @@ class HtmlDocVisitor : public DocVisitor
     void operator()(const DocHtmlCaption &);
     void operator()(const DocInternal &);
     void operator()(const DocHRef &);
-    void operator()(const DocHtmlSummary &);
-    void operator()(const DocHtmlDetails &);
     void operator()(const DocHtmlHeader &);
     void operator()(const DocImage &);
     void operator()(const DocDotFile &);
@@ -117,7 +115,7 @@ class HtmlDocVisitor : public DocVisitor
 
     void writeObfuscatedMailAddress(const QCString &url);
     void filter(const QCString &str, const bool retainNewline = false);
-    QCString filterQuotedCdataAttr(const QCString &str);
+    void filterQuotedCdataAttr(const QCString &str);
     void startLink(const QCString &ref,const QCString &file,
                    const QCString &relPath,const QCString &anchor,
                    const QCString &tooltip = "");

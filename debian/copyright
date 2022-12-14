@@ -1,0 +1,264 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: doxygen
+Upstream-Contact: Dimitri van Heesch <doxygen@gmail.com)>
+Source: https://github.com/doxygen/doxygen
+
+Files: *
+Copyright: 1997-2022, Dimitri van Heesch and others
+License: GPL-2
+
+Files: addon/doxyparse/*
+Copyright: 2009-2019, Joenio Costa <joenio@joenio.me>
+  2009, Antonio Terceiro <terceiro@softwarelivre.org>
+License: GPL-2
+
+Files: debian/*
+Copyright:
+ 2000-2003, Luca Filipozzi
+ 2004-2016, Matthias Klose
+ 2013-2014, Helmut Grohne
+ 2018-2022, Paolo Greppi <paolo.greppi@libpf.com>
+ and others
+License: GPL-2
+Comment: no license was ever declared by the authors, so assuming a derivative work
+
+Files: debian/dh-doxygen/dh_doxygen
+Copyright: 2013, Helmut Grohne
+  2011, Jakub Wilk
+License: BSD-2-clause
+
+Files: filesystem/*
+Copyright: 2018, Steffen Schümann <s.schuemann@pobox.com>
+License: Expat
+
+Files: jquery/jquery*.js
+Copyright: 2006-2019, OpenJS Foundation and other contributors
+License: Expat
+
+Files: jquery/jquery.powertip*.js
+Copyright: 2018, Steven Benner (http://stevenbenner.com/).
+License: Expat
+
+Files: jquery/jquery.scrollTo*.js
+Copyright: 2007-2009, Ariel Flesler
+License: Expat
+
+Files: jquery/jquery.smartmenus*.js
+Copyright: 2013-2017, Vasil Dinkov, Vadikom Web Ltd. http://vadikom.com
+License: Expat
+
+Files: jquery/jquery.ui-*.js
+Copyright: 2006-2019, OpenJS Foundation and other contributors
+License: Expat
+
+Files: jquery/jquery.ui.touch-punch*.js
+Copyright: 2011–2014, Dave Furfero
+License: Expat or GPL-2
+
+Files: liblodepng/*
+Copyright: 2005-2008, Lode Vandevenne
+License: Zlib
+
+Files: libmd5/*
+Copyright: 1997-2022, Dimitri van Heesch and others
+License: public-domain
+
+Files: libmscgen/*
+Copyright: 1989, 1991, Free Software Foundation, Inc.
+License: GPL-2
+
+Files: libmscgen/gd.c
+  libmscgen/gd.h
+  libmscgen/gd_color.c
+  libmscgen/gd_color.h
+  libmscgen/gd_errors.h
+  libmscgen/gd_intern.h
+  libmscgen/gd_lodepng.c
+  libmscgen/gd_security.c
+  libmscgen/gdfonts.c
+  libmscgen/gdfonts.h
+  libmscgen/gdfontt.c
+  libmscgen/gdfontt.h
+  libmscgen/gdhelpers.c
+  libmscgen/gdhelpers.h
+  libmscgen/gdtables.c
+  libmscgen/mscgen_api.c
+  libmscgen/mscgen_api.h
+  libmscgen/mscgen_config.h
+Copyright: 1997-2022, Dimitri van Heesch and others
+License: GPL-2
+
+Files: libmscgen/mscgen_adraw.c
+  libmscgen/mscgen_adraw.h
+  libmscgen/mscgen_adraw_int.h
+  libmscgen/mscgen_bool.h
+  libmscgen/mscgen_gd_out.c
+  libmscgen/mscgen_lexer.h
+  libmscgen/mscgen_msc.c
+  libmscgen/mscgen_msc.h
+  libmscgen/mscgen_null_out.c
+  libmscgen/mscgen_ps_out.c
+  libmscgen/mscgen_safe.c
+  libmscgen/mscgen_safe.h
+  libmscgen/mscgen_svg_out.c
+  libmscgen/mscgen_usage.c
+  libmscgen/mscgen_usage.h
+  libmscgen/mscgen_utf8.c
+  libmscgen/mscgen_utf8.h
+Copyright: 2005, 2008-2010, Michael C McTernan, Michael.McTernan.2001@cs.bris.ac.uk
+License: GPL-2+
+
+Files: src/rtfgen.cpp
+  src/rtfgen.h
+Copyright: 1997-2015, Parker Waechter & Dimitri van Heesch.
+License: GPL-2
+
+Files: src/vhdljjparser.cpp
+Copyright: 2014, M. Kreis
+License: GPL-2
+
+Files: templates/html/bib2xhtml.pl
+Copyright: 2002-2010, Diomidis Spinellis
+  1995, 1996, David Hull.
+License: GPL-2
+
+Files: templates/html/dynsections.js
+  templates/html/extsearch.js
+  templates/html/menu.js
+  templates/html/navtree.js
+  templates/html/resize.js
+  templates/html/search.js
+Copyright: 1997-2021, Dimitri van Heesch
+License: Expat
+
+Files: templates/html/jquery.js
+Copyright: 2006-2019, OpenJS Foundation and other contributors
+License: Expat
+
+Files: templates/html/svgpan.js
+Copyright: 2009, 2010, Andrea Leofreddi <a.leofreddi@itcharm.com>.
+License: BSD-2-clause
+
+Files: testing/dtd/*
+Copyright: 1998-2002, W3C (MIT, INRIA, Keio)
+License: GPL-2
+
+Files: winbuild/*
+Copyright: 1999-2003, Free Software Foundation, Inc.
+License: LGPL-2+
+
+License: BSD-2-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
+ .
+ * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+ .
+ * Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: Expat
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
+ .
+ The above copyright notice and this permission notice shall be
+ included in all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+License: GPL-2
+ This program is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public
+ License as published by the Free Software Foundation;
+ version 2 of the License.
+ .
+ This program is distributed in the hope that it will be
+ useful, but WITHOUT ANY WARRANTY; without even the implied
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ PURPOSE.  See the GNU General Public License for more
+ details.
+ .
+ You should have received a copy of the GNU General Public
+ License along with this package; if not, write to the Free
+ Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ Boston, MA  02110-1301 USA
+ .
+ On Debian systems, the full text of the GNU General Public
+ License version 2 can be found in the file
+ `/usr/share/common-licenses/GPL-2'.
+
+License: GPL-2+
+ This software is Copyright (c) 2022 by X. Ample.
+ .
+ This is free software, licensed under:
+ .
+   The GNU General Public License, Version 2, June 1991
+ .
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 dated June, 1991, or (at
+ your option) any later version.
+ On Debian systems, the complete text of version 2 of the GNU General
+ Public License can be found in '/usr/share/common-licenses/GPL-2'.
+
+License: LGPL-2+
+ This software is Copyright (c) 2022 by X. Ample.
+ .
+ This is free software, licensed under:
+ .
+   The GNU Library General Public License, Version 2, June 1991
+ .
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU Library General Public License as published by the
+ Free Software Foundation; version 2 of the License, or (at
+ your option) any later version.
+ On Debian systems, the complete text of version 2 of the GNU Library
+ General Public License can be found in '/usr/share/common-licenses/LGPL-2'.
+
+License: Zlib
+ This software is provided 'as-is', without any express or implied
+ warranty. In no event will the authors be held liable for any damages
+ arising from the use of this software.
+ .
+ Permission is granted to anyone to use this software for any purpose,
+ including commercial applications, and to alter it and redistribute it
+ freely, subject to the following restrictions:
+ .
+     1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+ .
+     2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+ .
+     3. This notice may not be removed or altered from any source
+     distribution.
+
+License: public-domain
+ placed in the public domain

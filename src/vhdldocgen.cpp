@@ -39,6 +39,7 @@
 #include "util.h"
 #include "language.h"
 #include "commentscan.h"
+#include "index.h"
 #include "definition.h"
 #include "searchindex.h"
 #include "outputlist.h"
@@ -2557,7 +2558,7 @@ static void addInstance(ClassDefMutable* classEntity, ClassDefMutable* ar,
   // fprintf(stderr,"\naddInstance %s to %s %s %s\n",qPrint( classEntity->name()),qPrint(cd->name()),qPrint(ar->name()),cur->name);
   n1=classEntity->name();
 
-  if (!cd->isBaseClass(classEntity, true))
+  if (!cd->isBaseClass(classEntity, true, 0))
   {
     cd->insertBaseClass(classEntity,n1,Public,Normal,QCString());
   }
@@ -2669,6 +2670,7 @@ bool VhdlDocGen::isSubClass(ClassDef* cd,ClassDef *scd, bool followInstances,int
   {
     err("Possible recursive class relation while inside %s and looking for %s\n",qPrint(cd->name()),qPrint(scd->name()));
     abort();
+    return FALSE;
   }
 
   for (const auto &bcd :cd->subClasses())
@@ -2678,17 +2680,13 @@ bool VhdlDocGen::isSubClass(ClassDef* cd,ClassDef *scd, bool followInstances,int
     //printf("isSubClass() subclass %s\n",qPrint(ccd->name()));
     if (ccd==scd)
     {
-      found=true;
+      found=TRUE;
     }
     else
     {
       if (level <256)
       {
-        level = ccd->isBaseClass(scd,followInstances);
-        if (level>0)
-        {
-          found=true;
-        }
+        found=ccd->isBaseClass(scd,followInstances,level+1);
       }
     }
   }
@@ -3252,16 +3250,7 @@ void FlowChart::addFlowChart(int type,const QCString &text,const QCString &exp, 
     expression=substitute(expression,"\"","\\\"");
   }
 
-  if (type & VARIABLE_NO)
-  {
-  // Ignore the empty section of the VHDL variable definition.
-  // This is section between `process` and `begin` keywords, where any source text is missing, probably a bug in the VHDL source parser.
-    if(text.isEmpty()) return;
-
-    flowList.insert(flowList.begin(),FlowChart(type,typeString,expression,label));
-    flowList.front().line=1; // TODO: use getLine(); of the parser
-  }
-  else if (type & START_NO)
+  if (type & (START_NO | VARIABLE_NO))
   {
     flowList.insert(flowList.begin(),FlowChart(type,typeString,expression,label));
     flowList.front().line=1; // TODO: use getLine(); of the parser

@@ -58,23 +58,13 @@ class NamespaceDefMutable;
 struct LookupInfo
 {
   LookupInfo() = default;
-  LookupInfo(const Definition *d,const MemberDef *td,QCString ts,QCString rt)
-    : definition(d), typeDef(td), templSpec(ts),resolvedType(rt) {}
-  const Definition  *definition = 0;
+  LookupInfo(const ClassDef *cd,const MemberDef *td,QCString ts,QCString rt)
+    : classDef(cd), typeDef(td), templSpec(ts),resolvedType(rt) {}
+  const ClassDef  *classDef = 0;
   const MemberDef *typeDef = 0;
   QCString   templSpec;
   QCString   resolvedType;
 };
-
-struct InputFileEncoding
-{
-  InputFileEncoding() {}
-  InputFileEncoding(const QCString &pat, const QCString &enc) : pattern(pat), encoding(enc) {}
-  QCString pattern;
-  QCString encoding;
-};
-
-using InputFileEncodingList = std::vector<InputFileEncoding>;
 
 using ClangUsrMap = std::unordered_map<std::string,const Definition *>;
 
@@ -115,8 +105,7 @@ class Doxygen
     static SearchIndexIntf          *searchIndex;
     static SymbolMap<Definition>    *symbolMap;
     static ClangUsrMap              *clangUsrMap;
-    static Cache<std::string,LookupInfo> *typeLookupCache;
-    static Cache<std::string,LookupInfo> *symbolLookupCache;
+    static Cache<std::string,LookupInfo> *lookupCache;
     static DirLinkedMap             *dirLinkedMap;
     static DirRelationLinkedMap      dirRelations;
     static ParserManager            *parserManager;
@@ -130,7 +119,6 @@ class Doxygen
     static bool                      clangAssistedParsing;
     static QCString                  verifiedDotPath;
     static volatile bool             terminating;
-    static InputFileEncodingList     inputFileEncodingList;
 };
 
 /** Deleter that only deletes an object if doxygen is not already terminating */
@@ -151,6 +139,7 @@ void adjustConfiguration();
 void parseInput();
 void generateOutput();
 void readAliases();
+void readFormulaRepository(QCString dir, bool cmp = FALSE);
 void cleanUpDoxygen();
 void readFileOrDirectory(const QCString &s,
                         FileNameLinkedMap *fnDict,

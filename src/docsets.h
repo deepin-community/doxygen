@@ -18,26 +18,23 @@
 
 #include <memory>
 
-#include "qcstring.h"
+#include "index.h"
 
 class TextStream;
 
 class Definition;
-class MemberDef;
 
 /** A class that generates docset files.
  *
  *  These files can be used to create context help
  *  for use within Apple's Xcode 3.0 development environment
  */
-class DocSets
+class DocSets  : public IndexIntf
 {
 
   public:
     DocSets();
-    virtual ~DocSets();
-    DocSets(DocSets &&);
-
+   ~DocSets();
     void initialize();
     void finalize();
     void incContentsDepth();

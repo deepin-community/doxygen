@@ -63,8 +63,7 @@ enum Tokens
   RetVal_EndBlockQuote  = 0x10014,
   RetVal_CopyDoc        = 0x10015,
   RetVal_EndInternal    = 0x10016,
-  RetVal_EndParBlock    = 0x10017,
-  RetVal_EndHtmlDetails = 0x10018
+  RetVal_EndParBlock    = 0x10017
 };
 
 #define TK_COMMAND_CHAR(token) ((token)==TK_COMMAND_AT ? "@" : "\\")
@@ -142,12 +141,10 @@ class DocTokenizer
     void pushContext();
     bool popContext();
     int  lex();
-    void unputString(const QCString &tag);
     void setStatePara();
     void setStateTitle();
     void setStateTitleAttrValue();
     void setStateCode();
-    void setStateICode();
     void setStateXmlCode();
     void setStateHtmlOnly();
     void setStateManOnly();
@@ -156,7 +153,6 @@ class DocTokenizer
     void setStateDbOnly();
     void setStateRtfOnly();
     void setStateVerbatim();
-    void setStateIVerbatim();
     void setStateILiteral();
     void setStateILiteralOpt();
     void setStateDot();
@@ -183,9 +179,7 @@ class DocTokenizer
     void setStateOptions();
     void setStateBlock();
     void setStateEmoji();
-    void setStateILine();
-    void setStateQuotedString();
-    void setStateShowDate();
+    void setStateIline();
 
   private:
     struct Private;

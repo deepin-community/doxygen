@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # python script to adjust generated VhdlParser.cc
 #
 # Copyright (C) 1997-2021 by Dimitri van Heesch.

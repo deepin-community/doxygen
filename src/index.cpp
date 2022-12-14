@@ -25,7 +25,6 @@
 
 #include "message.h"
 #include "index.h"
-#include "indexlist.h"
 #include "doxygen.h"
 #include "config.h"
 #include "filedef.h"
@@ -1650,7 +1649,7 @@ static void writeNamespaceTreeElement(const NamespaceDef *nd,FTVHelp *ftv,
     bool hasChildren = namespaceHasNestedNamespace(nd) ||
       namespaceHasNestedClass(nd,false,ClassDef::Class) ||
       namespaceHasNestedConcept(nd);
-    bool isLinkable  = nd->isLinkable();
+    bool isLinkable  = nd->isLinkableInProject();
     int visibleMembers = countVisibleMembers(nd);
 
     //printf("namespace %s hasChildren=%d visibleMembers=%d\n",qPrint(nd->name()),hasChildren,visibleMembers);
@@ -1704,7 +1703,7 @@ static void writeNamespaceTree(const NamespaceLinkedRefMap &nsLinkedMap,FTVHelp 
 {
   for (const auto &nd : nsLinkedMap)
   {
-    if (nd->isLinkable())
+    if (nd->isLinkableInProject())
     {
       writeNamespaceTreeElement(nd,ftv,rootOnly,addToIndex);
     }
@@ -1716,7 +1715,7 @@ static void writeNamespaceTree(const NamespaceLinkedMap &nsLinkedMap,FTVHelp *ft
 {
   for (const auto &nd : nsLinkedMap)
   {
-    if (nd->isLinkable())
+    if (nd->isLinkableInProject())
     {
       writeNamespaceTreeElement(nd.get(),ftv,rootOnly,addToIndex);
     }
@@ -3531,7 +3530,7 @@ static void countRelatedPages(int &docPages,int &indexPages)
   docPages=indexPages=0;
   for (const auto &pd : *Doxygen::pageLinkedMap)
   {
-    if (pd->visibleInIndex() && !pd->hasParentPage())
+    if (pd->visibleInIndex())
     {
       indexPages++;
     }
@@ -3557,7 +3556,7 @@ static bool mainPageHasOwnTitle()
 
 static void writePages(const PageDef *pd,FTVHelp *ftv)
 {
-  //printf("writePages()=%s pd=%p mainpage=%p\n",qPrint(pd->name()),(void*)pd,(void*)Doxygen::mainPage.get());
+  //printf("writePages()=%s pd=%p mainpage=%p\n",qPrint(pd->name()),pd,Doxygen::mainPage);
   LayoutNavEntry *lne = LayoutDocManager::instance().rootNavEntry()->find(LayoutNavEntry::Pages);
   bool addToIndex = lne==0 || lne->visible();
   if (!addToIndex) return;
@@ -3578,7 +3577,7 @@ static void writePages(const PageDef *pd,FTVHelp *ftv)
     {
       //printf("*** adding %s hasSubPages=%d hasSections=%d\n",qPrint(pageTitle),hasSubPages,hasSections);
       ftv->addContentsItem(
-          hasSubPages || hasSections,pageTitle,
+          hasSubPages,pageTitle,
           pd->getReference(),pd->getOutputFileBase(),
           QCString(),hasSubPages,TRUE,pd);
     }
@@ -3587,7 +3586,7 @@ static void writePages(const PageDef *pd,FTVHelp *ftv)
       Doxygen::indexList->addContentsItem(
           hasSubPages || hasSections,pageTitle,
           pd->getReference(),pd->getOutputFileBase(),
-          QCString(),hasSubPages,TRUE,pd);
+          QCString(),hasSubPages,TRUE);
     }
   }
   if (hasSubPages && ftv) ftv->incContentsDepth();
@@ -4272,7 +4271,7 @@ static void writeConceptIndex(OutputList &ol)
 
 static void writeUserGroupStubPage(OutputList &ol,LayoutNavEntry *lne)
 {
-  if (lne->baseFile().startsWith("usergroup"))
+  if (lne->baseFile().left(9)=="usergroup")
   {
     ol.pushGeneratorState();
     ol.disableAllBut(OutputGenerator::Html);
@@ -4346,22 +4345,21 @@ static void writeIndex(OutputList &ol)
 
   if (Doxygen::mainPage)
   {
-    bool hasSubs = Doxygen::mainPage->hasSubPages() || Doxygen::mainPage->hasSections();
-    bool hasTitle = !projectName.isEmpty() && mainPageHasTitle() && qstricmp(title,projectName)!=0;
-    //printf("** mainPage title=%s hasTitle=%d hasSubs=%d\n",qPrint(title),hasTitle,hasSubs);
-    if (hasTitle) // to avoid duplicate entries in the treeview
+    if (
+        (!projectName.isEmpty() && mainPageHasTitle() && qstricmp(title,projectName)!=0)
+       ) // to avoid duplicate entries in the treeview
     {
-      Doxygen::indexList->addContentsItem(hasSubs,
-                                          title,
-                                          QCString(),
-                                          indexName,
-                                          QCString(),
-                                          hasSubs,
-                                          TRUE);
+      Doxygen::indexList->addContentsItem(Doxygen::mainPage->hasSubPages() || Doxygen::mainPage->hasSections(),title,QCString(),indexName,QCString(),Doxygen::mainPage->hasSubPages(),TRUE);
+      if (Doxygen::mainPage->hasSubPages()) Doxygen::indexList->incContentsDepth();
+
     }
-    if (hasSubs)
+    if (Doxygen::mainPage->hasSubPages() || Doxygen::mainPage->hasSections())
     {
       writePages(Doxygen::mainPage.get(),0);
+    }
+    if (!projectName.isEmpty() && mainPageHasTitle() && qstricmp(title,projectName)!=0 && Doxygen::mainPage->hasSubPages())
+    {
+      if (Doxygen::mainPage->hasSubPages()) Doxygen::indexList->decContentsDepth();
     }
   }
 
@@ -4703,10 +4701,6 @@ static std::vector<bool> indexWritten;
 
 static void writeIndexHierarchyEntries(OutputList &ol,const LayoutNavEntryList &entries)
 {
-  auto isRef = [](const QCString &s)
-  {
-    return s.startsWith("@ref") || s.startsWith("\\ref");
-  };
   bool sliceOpt = Config_getBool(OPTIMIZE_OUTPUT_SLICE);
   for (const auto &lne : entries)
   {
@@ -4931,7 +4925,6 @@ static void writeIndexHierarchyEntries(OutputList &ol,const LayoutNavEntryList &
           writeExampleIndex(ol);
           break;
         case LayoutNavEntry::User:
-          if (addToIndex)
           {
             // prepend a ! or ^ marker to the URL to avoid tampering with it
             QCString url = correctURL(lne->url(),"!"); // add ! to relative URL
@@ -4940,8 +4933,8 @@ static void writeIndexHierarchyEntries(OutputList &ol,const LayoutNavEntryList &
             {
               url.prepend("^"); // prepend ^ to absolute URL
             }
-            Doxygen::indexList->addContentsItem(TRUE,lne->title(),QCString(),
-                                                url,QCString(),FALSE,isRef(lne->baseFile()) || isRelative);
+            bool isRef = lne->baseFile().left(4)=="@ref" || lne->baseFile().left(4)=="\\ref";
+            Doxygen::indexList->addContentsItem(TRUE,lne->title(),QCString(),url,QCString(),FALSE,isRef || isRelative);
           }
           break;
         case LayoutNavEntry::UserGroup:
@@ -4961,8 +4954,8 @@ static void writeIndexHierarchyEntries(OutputList &ol,const LayoutNavEntryList &
                 {
                   url.prepend("^"); // prepend ^ to absolute URL
                 }
-                Doxygen::indexList->addContentsItem(TRUE,lne->title(),QCString(),
-                                                    url,QCString(),FALSE,isRef(lne->baseFile()) || isRelative);
+                bool isRef = lne->baseFile().left(4)=="@ref" || lne->baseFile().left(4)=="\\ref";
+                Doxygen::indexList->addContentsItem(TRUE,lne->title(),QCString(),url,QCString(),FALSE,isRef || isRelative);
               }
             }
             else

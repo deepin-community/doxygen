@@ -236,14 +236,13 @@ inline bool insideTable(const DocNodeVariant *n)
 
 //---------------------------------------------------------------------------
 
-inline bool insideDetails(const DocNodeVariant *n)
+inline bool insideDetails(DocStyleChangeStack styleStack)
 {
-  while (n)
+  for (auto i : styleStack)
   {
-    if (std::holds_alternative<DocHtmlDetails>(*n)) return TRUE;
-    n=parent(n);
+     if (std::get<DocStyleChange>(*i).style() == DocStyleChange::Details) return true;
   }
-  return FALSE;
+  return false;
 }
 
 

@@ -28,7 +28,7 @@
 #include "message.h"
 #include "doxygen.h"
 #include "language.h"
-#include "indexlist.h"
+#include "index.h"
 #include "dir.h"
 
 #define MAP_CMD "cmapx"

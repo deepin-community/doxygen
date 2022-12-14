@@ -18,7 +18,6 @@
 #include <cstdio>
 #include <algorithm>
 
-#include "types.h"
 #include "classdef.h"
 #include "classlist.h"
 #include "entry.h"
@@ -135,10 +134,15 @@ static QCString makeDisplayName(const ClassDef *cd,bool includeScope)
   {
     n=substitute(n,"::",sep);
   }
-  if (cd->compoundType()==ClassDef::Protocol && n.endsWith("-p"))
+  if (cd->compoundType()==ClassDef::Protocol && n.right(2)=="-p")
   {
     n="<"+n.left(n.length()-2)+">";
   }
+  //else if (n.right(2)=="-g")
+  //{
+  //  n = n.left(n.length()-2);
+  //}
+  //printf("ClassDefImpl::displayName()=%s\n",qPrint(n));
   return n;
 }
 
@@ -187,7 +191,7 @@ class ClassDefImpl : public DefinitionMixin<ClassDefMutable>
     virtual const ArgumentList &templateArguments() const;
     virtual FileDef *getFileDef() const;
     virtual const MemberDef *getMemberByName(const QCString &) const;
-    virtual int isBaseClass(const ClassDef *bcd,bool followInstances) const;
+    virtual bool isBaseClass(const ClassDef *bcd,bool followInstances,int level=0) const;
     virtual bool isSubClass(ClassDef *bcd,int level=0) const;
     virtual bool isAccessibleMember(const MemberDef *md) const;
     virtual const TemplateInstanceList &getTemplateInstances() const;
@@ -435,8 +439,8 @@ class ClassDefAliasImpl : public DefinitionAliasMixin<ClassDef>
     { return getCdAlias()->getFileDef(); }
     virtual const MemberDef *getMemberByName(const QCString &s) const
     { return getCdAlias()->getMemberByName(s); }
-    virtual int isBaseClass(const ClassDef *bcd,bool followInstances) const
-    { return getCdAlias()->isBaseClass(bcd,followInstances); }
+    virtual bool isBaseClass(const ClassDef *bcd,bool followInstances,int level=0) const
+    { return getCdAlias()->isBaseClass(bcd,followInstances,level); }
     virtual bool isSubClass(ClassDef *bcd,int level=0) const
     { return getCdAlias()->isSubClass(bcd,level); }
     virtual bool isAccessibleMember(const MemberDef *md) const
@@ -1274,7 +1278,7 @@ static void searchTemplateSpecs(/*in*/  const Definition *d,
     const ClassDef *cd=toClassDef(d);
     if (!name.isEmpty()) name+="::";
     QCString clName = d->localName();
-    if (clName.endsWith("-p"))
+    if (/*clName.right(2)=="-g" ||*/ clName.right(2)=="-p")
     {
       clName = clName.left(clName.length()-2);
     }
@@ -3200,30 +3204,28 @@ void ClassDefImpl::setTemplateArguments(const ArgumentList &al)
   m_impl->tempArgs = al;
 }
 
-static bool hasNonReferenceSuperClassRec(const ClassDef *cd,int level)
+/*! Returns \c TRUE iff this class or a class inheriting from this class
+ *  is \e not defined in an external tag file.
+ */
+bool ClassDefImpl::hasNonReferenceSuperClass() const
 {
-  bool found=!cd->isReference() && cd->isLinkableInProject() && !cd->isHidden();
+  bool found=!isReference() && isLinkableInProject() && !isHidden();
   if (found)
   {
     return TRUE; // we're done if this class is not a reference
   }
-  for (const auto &ibcd : cd->subClasses())
+  for (const auto &ibcd : m_impl->inheritedBy)
   {
-    const ClassDef *bcd=ibcd.classDef;
-    if (level>256)
-    {
-      err("Possible recursive class relation while inside %s and looking for base class %s\n",qPrint(cd->name()),qPrint(bcd->name()));
-      return FALSE;
-    }
+    ClassDef *bcd=ibcd.classDef;
     // recurse into the super class branch
-    found = found || hasNonReferenceSuperClassRec(bcd,level+1);
+    found = found || bcd->hasNonReferenceSuperClass();
     if (!found)
     {
       // look for template instances that might have non-reference super classes
       for (const auto &cil : bcd->getTemplateInstances())
       {
         // recurse into the template instance branch
-        found = hasNonReferenceSuperClassRec(cil.classDef,level+1);
+        found = cil.classDef->hasNonReferenceSuperClass();
         if (found) break;
       }
     }
@@ -3233,14 +3235,6 @@ static bool hasNonReferenceSuperClassRec(const ClassDef *cd,int level)
     }
   }
   return found;
-}
-
-/*! Returns \c TRUE iff this class or a class inheriting from this class
- *  is \e not defined in an external tag file.
- */
-bool ClassDefImpl::hasNonReferenceSuperClass() const
-{
-  return hasNonReferenceSuperClassRec(this,0);
 }
 
 QCString ClassDefImpl::requiresClause() const
@@ -3365,40 +3359,26 @@ bool ClassDefImpl::hasDocumentation() const
 
 //----------------------------------------------------------------------
 // recursive function:
-// returns the distance to the base class definition 'bcd' represents an (in)direct base
-// class of class definition 'cd' or 0 if it does not.
+// returns TRUE iff class definition 'bcd' represents an (in)direct base
+// class of class definition 'cd'.
 
-int ClassDefImpl::isBaseClass(const ClassDef *bcd, bool followInstances) const
+bool ClassDefImpl::isBaseClass(const ClassDef *bcd, bool followInstances,int level) const
 {
-  int distance=0;
+  bool found=FALSE;
   //printf("isBaseClass(cd=%s) looking for %s\n",qPrint(name()),qPrint(bcd->name()));
+  if (level>256)
+  {
+    err("Possible recursive class relation while inside %s and looking for base class %s\n",qPrint(name()),qPrint(bcd->name()));
+    return FALSE;
+  }
   for (const auto &bclass : baseClasses())
   {
     const ClassDef *ccd = bclass.classDef;
     if (!followInstances && ccd->templateMaster()) ccd=ccd->templateMaster();
-    if (ccd==bcd)
-    {
-      distance=1;
-      break; // no shorter path possible
-    }
-    else
-    {
-      int d = ccd->isBaseClass(bcd,followInstances);
-      if (d>256)
-      {
-        err("Possible recursive class relation while inside %s and looking for base class %s\n",qPrint(name()),qPrint(bcd->name()));
-        return 0;
-      }
-      else if (d>0) // path found
-      {
-        if (distance==0 || d+1<distance) // update if no path found yet or shorter path found
-        {
-          distance=d+1;
-        }
-      }
-    }
+    found = (ccd==bcd) || ccd->isBaseClass(bcd,followInstances,level+1);
+    if (found) break;
   }
-  return distance;
+  return found;
 }
 
 //----------------------------------------------------------------------

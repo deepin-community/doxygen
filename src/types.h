@@ -300,7 +300,6 @@ enum FortranFormat
   FortranFormat_Fixed
 };
 
-
 class LocalToc
 {
   public:

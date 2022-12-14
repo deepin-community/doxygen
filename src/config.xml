@@ -95,7 +95,7 @@ Use doxygen to compare the used configuration file with the template configurati
       doxygen -x [configFile]
 \endverbatim
 Use doxygen to compare the used configuration file with the template configuration file
-without replacing the environment variables or CMake type replacement variables:
+without replacing the environment variables:
 \verbatim
       doxygen -x_noenv [configFile]
 \endverbatim
@@ -995,7 +995,7 @@ Go to the <a href="commands.html">next</a> section or return to the
 ]]>
       </docs>
     </option>
-    <option type='enum' id='CASE_SENSE_NAMES' defval='SYSTEM'>
+    <option type='bool' id='CASE_SENSE_NAMES' defval='0' altdefval='Portable::fileSystemIsCaseSensitive()'>
       <docs>
 <![CDATA[
  With the correct setting of option \c CASE_SENSE_NAMES doxygen will better be able to match the
@@ -1014,9 +1014,6 @@ Go to the <a href="commands.html">next</a> section or return to the
  whereas on Linux or other Unix flavors it should typically be set to \c YES.
 ]]>
       </docs>
-      <value name="SYSTEM" />
-      <value name="NO"/>
-      <value name="YES" />
     </option>
     <option type='bool' id='HIDE_SCOPE_NAMES' defval='0'>
       <docs>
@@ -1458,22 +1455,6 @@ FILE_VERSION_FILTER = "cleartool desc -fmt \%Vn"
  Doxygen uses `libiconv` (or the `iconv` built into `libc`) for the transcoding.
  See <a href="https://www.gnu.org/software/libiconv/">the libiconv documentation</a> for
  the list of possible encodings.
-
- \sa  \ref cfg_input_file_encoding "INPUT_FILE_ENCODING"
-]]>
-      </docs>
-    </option>
-    <option type='list' id='INPUT_FILE_ENCODING' format='string'>
-      <docs>
-<![CDATA[
- This tag can be used to specify the character encoding of the source files that doxygen
- parses
- The \c INPUT_FILE_ENCODING tag can be used to specify character encoding on a per file pattern
- basis. Doxygen will compare the file name with each pattern and apply the
- encoding instead of the default \ref cfg_input_encoding "INPUT_ENCODING") if there is a match.
- The character encodings are a list of the form: pattern=encoding (like `*.php=ISO-8859-1`).
-
- See cfg_input_encoding "INPUT_ENCODING" for further information on supported encodings.
 ]]>
       </docs>
     </option>
@@ -1647,9 +1628,6 @@ FILE_VERSION_FILTER = "cleartool desc -fmt \%Vn"
  <br>Note that the filter must not add or remove lines; it is applied before the
  code is scanned, but not when the output code is generated. If lines are added
  or removed, the anchors will not be placed correctly.
- <br>Note that doxygen will use the data processed and written to standard output for further processing,
- therefore nothing else, like debug statements or used commands (so in case of a Windows batch file
- always use `@echo OFF`), should be written to standard output.
  <br>Note that for custom extensions or not directly supported extensions you also
  need to set \ref cfg_extension_mapping "EXTENSION_MAPPING" for the extension
  otherwise the files are not properly processed by doxygen.<br>
@@ -1701,17 +1679,6 @@ FILE_VERSION_FILTER = "cleartool desc -fmt \%Vn"
  is part of the input, its contents will be placed on the main page (`index.html`).
  This can be useful if you have a project on for instance GitHub and want to reuse
  the introduction page also for the doxygen output.
-]]>
-      </docs>
-    </option>
-    <option type='int' id='FORTRAN_COMMENT_AFTER' defval='72' minval='7' maxval='10000'>
-      <docs>
-<![CDATA[
- The Fortran standard specifies that for fixed formatted Fortran code all characters
- from position 72 are to be considered as comment. A common extension is to allow
- longer lines before the automatic comment starts.
- The setting \c FORTRAN_COMMENT_AFTER will also make it possible that longer lines can be
- processed before the automatic comment starts.
 ]]>
       </docs>
     </option>
@@ -2085,9 +2052,6 @@ doxygen -w html new_header.html new_footer.html new_stylesheet.css YourConfigFil
  the output directory.
  \note The order of the extra style sheet files is of importance (e.g. the last
  style sheet in the list overrules the setting of the previous ones in the list).
- \note Since the styling of scrollbars can currently not be overruled in Webkit/Chromium, the
- styling will be left out of the default doxygen.css if extra stylesheets have be specified.
- So if scrollbar customization is desired it has to be added explicitly.
 ]]>
       </docs>
       <docs doxywizard='0' doxyfile='0'>
@@ -2142,19 +2106,6 @@ hr.footer {
  the files will be copied as-is; there are no commands or markers available.
 ]]>
       </docs>
-    </option>
-    <option type='enum' id='HTML_COLORSTYLE' defval='AUTO_LIGHT' depends='GENERATE_HTML'>
-      <docs>
-<![CDATA[
- The \c HTML_COLORSTYLE tag can be used to specify if the generated HTML output should be rendered with
- a dark or light theme.
-]]>
-      </docs>
-      <value name="LIGHT" desc="always generate light mode output"/>
-      <value name="DARK" desc="always generate dark mode output"/>
-      <value name="AUTO_LIGHT" desc="automatically set the mode according to the user preference, use light mode if no preference is set (the default)"/>
-      <value name="AUTO_DARK" desc="automatically set the mode according to the user preference, use dark mode if no preference is set"/>
-      <value name="TOGGLE" desc="allow to user to switch between light and dark mode via a button"/>
     </option>
     <option type='int' id='HTML_COLORSTYLE_HUE' minval='0' maxval='359' defval='220' depends='GENERATE_HTML'>
       <docs>
@@ -2588,6 +2539,17 @@ obfuscate email addresses.
 ]]>
       </docs>
     </option>
+    <option type='bool' id='FORMULA_TRANSPARENT' defval='1' depends='GENERATE_HTML'>
+      <docs>
+<![CDATA[
+ Use the \c FORMULA_TRANSPARENT tag to determine whether or not the images
+ generated for formulas are transparent PNGs. Transparent PNGs are
+ not supported properly for IE 6.0, but are supported on all modern browsers.
+ <br>Note that when changing this option you need to delete any `form_*.png` files
+ in the HTML output directory before the changes have effect.
+]]>
+      </docs>
+    </option>
     <option type='string' id='FORMULA_MACROFILE' format='file' defval=''>
       <docs>
 <![CDATA[
@@ -2975,7 +2937,6 @@ doxygen -w latex new_header.tex new_footer.tex new_stylesheet.sty
  <dt><code>$papertype</code><dd>will be replaced by the paper type as set in
            \ref cfg_paper_type "PAPER_TYPE" and the word "paper" is directly appended to it to have
            a correct \f$\mbox{\LaTeX}\f$ paper type.
- <dt><code>$langISO</code><dd>will be replaced by the ISO language name.
  <dt><code>$languagesupport</code><dd>will be replaced by an output language dependent setting
            of packages required for translating terms of the specified language.
  <dt><code>$latexfontenc</code><dd>will be replaced by an output language dependent setting
@@ -3643,49 +3604,32 @@ to be found in the default search path.
 ]]>
       </docs>
     </option>
-    <option type='string' id='DOT_COMMON_ATTR' format='string' depends='HAVE_DOT'
-      defval='fontname=Helvetica,fontsize=10'>
+    <option type='string' id='DOT_FONTNAME' format='string' defval='Helvetica' depends='HAVE_DOT'>
       <docs>
 <![CDATA[
- \c DOT_COMMON_ATTR is common attributes for nodes, edges and labels of subgraphs.
  When you want a differently looking font in the dot files that doxygen generates
- you can specify fontname, fontcolor and fontsize attributes.
- For details please see
- <a href=https://graphviz.org/doc/info/attrs.html>Node, Edge and Graph Attributes specification</a>
- You need to make sure dot is able to find the font,
- which can be done by putting it in a standard location
- or by setting the \c DOTFONTPATH environment variable or by
- setting \ref cfg_dot_fontpath "DOT_FONTPATH" to the
+ you can specify the font name
+ using \c DOT_FONTNAME. You need to make sure dot is able to find the font,
+ which can be done by putting it in a standard location or by setting the
+ \c DOTFONTPATH environment variable or by setting \ref cfg_dot_fontpath "DOT_FONTPATH" to the
  directory containing the font.
- Default graphviz fontsize is 14.
 ]]>
       </docs>
     </option>
-    <option type='string' id='DOT_EDGE_ATTR' format='string' depends='HAVE_DOT'
-      defval='labelfontname=Helvetica,labelfontsize=10'>
+    <option type='int' id='DOT_FONTSIZE' minval='4' maxval='24' defval='10' depends='HAVE_DOT'>
       <docs>
 <![CDATA[
- \c DOT_EDGE_ATTR is concatenated with \ref cfg_dot_common_attr "DOT_COMMON_ATTR".
- For elegant style you can add 'arrowhead=open, arrowtail=open, arrowsize=0.5'.
- <a href=https://graphviz.org/doc/info/arrows.html>Complete documentation about arrows shapes.</a>
-]]>
-      </docs>
-    </option>
-    <option type='string' id='DOT_NODE_ATTR' format='string' depends='HAVE_DOT'
-      defval='shape=box,height=0.2,width=0.4'>
-      <docs>
-<![CDATA[
- \c DOT_NODE_ATTR is concatenated with \ref cfg_dot_common_attr "DOT_COMMON_ATTR".
- For view without boxes around nodes set 'shape=plain' or 'shape=plaintext'
- <a href=https://www.graphviz.org/doc/info/shapes.html>Shapes specification</a>
+ The \c DOT_FONTSIZE tag can be used to set the size (in points) of the font of dot graphs.
 ]]>
       </docs>
     </option>
     <option type='string' id='DOT_FONTPATH' format='dir' defval='' depends='HAVE_DOT'>
       <docs>
 <![CDATA[
- You can set the path where \c dot can find font specified with
- fontname in \ref cfg_dot_common_attr "DOT_COMMON_ATTR" and others dot attributes.
+ By default doxygen will tell \c dot to use the default font as specified with \ref cfg_dot_fontname "DOT_FONTNAME".
+ If you specify a
+ different font using \ref cfg_dot_fontname "DOT_FONTNAME" you can set the path where \c dot
+ can find it using this tag.
 ]]>
       </docs>
     </option>
@@ -3981,6 +3925,19 @@ UML notation for the relationships.
 ]]>
       </docs>
     </option>
+    <option type='bool' id='DOT_TRANSPARENT' defval='0' depends='HAVE_DOT'>
+      <docs>
+<![CDATA[
+ Set the \c DOT_TRANSPARENT tag to \c YES to generate images with a transparent
+ background. This is disabled by default, because dot on Windows does not
+ seem to support this out of the box.
+ <br>
+ Warning: Depending on the platform used,
+ enabling this option may lead to badly anti-aliased labels on the edges of
+ a graph (i.e. they become hard to read).
+]]>
+      </docs>
+    </option>
     <option type='bool' id='DOT_MULTI_TARGETS' defval='0' depends='HAVE_DOT'>
       <docs>
 <![CDATA[
@@ -4041,9 +3998,5 @@ This setting is not only used for dot files but also for msc temporary files.
     <option type='obsolete' orgtype='bool' id='RTF_SOURCE_CODE'/>
     <option type='obsolete' orgtype='bool' id='LATEX_SOURCE_CODE'/>
     <option type='obsolete' orgtype='bool' id='CLASS_DIAGRAMS'/>
-    <option type='obsolete' orgtype='int' id='DOT_FONTSIZE'/>
-    <option type='obsolete' orgtype='string' id='DOT_FONTNAME'/>
-    <option type='obsolete' orgtype='bool' id='FORMULA_TRANSPARENT'/>
-    <option type='obsolete' orgtype='bool' id='DOT_TRANSPARENT'/>
   </group>
 </doxygenconfig>

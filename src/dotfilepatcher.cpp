@@ -146,7 +146,7 @@ static QCString replaceRef(const QCString &buf,const QCString &relPath,
     QCString result;
     if (urlOnly) // for user defined dot graphs
     {
-      if (link.startsWith("\\ref ") || link.startsWith("@ref ")) // \ref url
+      if (link.left(5)=="\\ref " || link.left(5)=="@ref ") // \ref url
       {
         result=href+"=\"";
         // fake ref node to resolve the url
@@ -230,7 +230,7 @@ bool DotFilePatcher::convertMapFile(TextStream &t,const QCString &mapName,
   while (getline(f,line)) // foreach line
   {
     QCString buf = line+'\n';
-    if (buf.startsWith("<area"))
+    if (buf.left(5)=="<area")
     {
       QCString replBuf = replaceRef(buf,relPath,urlOnly,context);
       // strip id="..." from replBuf since the id's are not needed and not unique.
@@ -255,7 +255,7 @@ DotFilePatcher::DotFilePatcher(const QCString &patchFile)
 
 bool DotFilePatcher::isSVGFile() const
 {
-  return m_patchFile.endsWith(".svg");
+  return m_patchFile.right(4)==".svg";
 }
 
 int DotFilePatcher::addMap(const QCString &mapFile,const QCString &relPath,
@@ -296,7 +296,7 @@ bool DotFilePatcher::run() const
 {
   //printf("DotFilePatcher::run(): %s\n",qPrint(m_patchFile));
   bool interactiveSVG_local = Config_getBool(INTERACTIVE_SVG);
-  bool isSVGFile = m_patchFile.endsWith(".svg");
+  bool isSVGFile = m_patchFile.right(4)==".svg";
   int graphId = -1;
   QCString relPath;
   if (isSVGFile)
@@ -331,10 +331,11 @@ bool DotFilePatcher::run() const
     return FALSE;
   }
   TextStream t(&fo);
-  int width=0,height=0;
+  int width,height;
   bool insideHeader=FALSE;
   bool replacedHeader=FALSE;
   bool foundSize=FALSE;
+  int lineNr=1;
   std::string lineStr;
   static const reg::Ex reSVG(R"([\[<]!-- SVG [0-9]+)");
   static const reg::Ex reMAP(R"(<!-- MAP [0-9]+)");
@@ -357,9 +358,8 @@ bool DotFilePatcher::run() const
           foundSize = count==2 && (width>500 || height>450);
           if (foundSize) insideHeader=TRUE;
         }
-        else if (insideHeader && !replacedHeader && line.find("<g id=\"graph")!=-1)
+        else if (insideHeader && !replacedHeader && line.find("<title>")!=-1)
         {
-          line="";
           if (foundSize)
           {
             // insert special replacement header for interactive SVGs
@@ -463,6 +463,7 @@ bool DotFilePatcher::run() const
     {
       t << line;
     }
+    lineNr++;
   }
   fi.close();
   if (isSVGFile && interactiveSVG_local && replacedHeader)

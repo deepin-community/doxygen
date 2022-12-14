@@ -16,17 +16,13 @@
 
 #include <memory>
 
-#include "qcstring.h"
+#include "index.h"
 
-class Definition;
-class MemberDef;
-
-class Qhp
+class Qhp : public IndexIntf
 {
   public:
     Qhp();
     ~Qhp();
-    Qhp(Qhp &&);
 
     void initialize();
     void finalize();

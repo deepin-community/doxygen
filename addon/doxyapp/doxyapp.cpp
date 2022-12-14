@@ -148,14 +148,11 @@ static void listSymbols()
 {
   for (const auto &kv : *Doxygen::symbolMap)
   {
-    for (const auto &def : kv.second)
-    {
-      listSymbol(def);
-    }
+    listSymbol(kv.second);
   }
 }
 
-static void lookupSymbol(const Definition *d)
+static void lookupSymbol(Definition *d)
 {
   if (d!=Doxygen::globalScope && // skip the global namespace symbol
       d->name().at(0)!='@'       // skip anonymous stuff
@@ -172,20 +169,20 @@ static void lookupSymbol(const Definition *d)
     {
       case Definition::TypeClass:
         {
-          const ClassDef *cd = dynamic_cast<const ClassDef*>(d);
+          ClassDef *cd = dynamic_cast<ClassDef*>(d);
           printf("Kind: %s\n",cd->compoundTypeString().data());
         }
         break;
       case Definition::TypeFile:
         {
-          const FileDef *fd = dynamic_cast<const FileDef*>(d);
+          FileDef *fd = dynamic_cast<FileDef*>(d);
           printf("Kind: File: #includes %zu other files\n",
               fd->includeFileList().size());
         }
         break;
       case Definition::TypeNamespace:
         {
-          const NamespaceDef *nd = dynamic_cast<const NamespaceDef*>(d);
+          NamespaceDef *nd = dynamic_cast<NamespaceDef*>(d);
           printf("Kind: Namespace: contains %zu classes and %zu namespaces\n",
               nd->getClasses().size(),
               nd->getNamespaces().size());
@@ -193,7 +190,7 @@ static void lookupSymbol(const Definition *d)
         break;
       case Definition::TypeMember:
         {
-          const MemberDef *md = dynamic_cast<const MemberDef*>(d);
+          MemberDef *md = dynamic_cast<MemberDef*>(d);
           printf("Kind: %s\n",md->memberTypeName().data());
         }
         break;
@@ -210,9 +207,9 @@ static void lookupSymbols(const QCString &sym)
   {
     auto range = Doxygen::symbolMap->find(sym);
     bool found=false;
-    for (const Definition *def : range)
+    for (auto it=range.first; it!=range.second; ++it)
     {
-      lookupSymbol(def);
+      lookupSymbol(it->second);
       found=true;
     }
     if (!found)

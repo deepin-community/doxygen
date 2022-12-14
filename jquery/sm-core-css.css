@@ -28,7 +28,7 @@
   left: 2px;
   height: 2px;
   width: 24px;
-  background: var(--nav-menu-button-color);
+  background: #666;
   -webkit-transition: all 0.25s;
   transition: all 0.25s;
 }

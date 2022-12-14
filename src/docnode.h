@@ -45,8 +45,7 @@ class DocParser;
 /* 35 */  DN(DocSecRefList)     DN_SEP DN(DocInternal)      DN_SEP DN(DocParBlock)       DN_SEP DN(DocSimpleList)   DN_SEP DN(DocHtmlList)    DN_SEP   \
 /* 40 */  DN(DocSimpleSect)     DN_SEP DN(DocSimpleSectSep) DN_SEP DN(DocParamSect)      DN_SEP DN(DocPara)         DN_SEP DN(DocParamList)   DN_SEP   \
 /* 45 */  DN(DocSimpleListItem) DN_SEP DN(DocHtmlListItem)  DN_SEP DN(DocHtmlDescData)   DN_SEP DN(DocHtmlCell)     DN_SEP DN(DocHtmlCaption) DN_SEP   \
-/* 50 */  DN(DocHtmlRow)        DN_SEP DN(DocHtmlTable)     DN_SEP DN(DocHtmlBlockQuote) DN_SEP DN(DocText)         DN_SEP DN(DocRoot)        DN_SEP   \
-/* 55 */  DN(DocHtmlDetails)    DN_SEP DN(DocHtmlSummary)                                                                                              \
+/* 50 */  DN(DocHtmlRow)        DN_SEP DN(DocHtmlTable)     DN_SEP DN(DocHtmlBlockQuote) DN_SEP DN(DocText)         DN_SEP DN(DocRoot)                 \
 
 // forward declarations
 #define DN(x) class x;
@@ -56,13 +55,13 @@ DOC_NODES
 #undef DN_SEP
 
 // define a variant type
+using DocNodeVariant = std::variant<
 #define DN(x) x
 #define DN_SEP ,
-using DocNodeVariant = std::variant<
 DOC_NODES
->;
 #undef DN
 #undef DN_SEP
+>;
 
 // getter functions to return the name of a doc node type
 #define DN(x) constexpr const char *docNodeName(const x &n) { return #x; }
@@ -272,7 +271,9 @@ class DocStyleChange : public DocNode
                  Del           = (1<<12),
                  Ins           = (1<<13),
                  S             = (1<<14),
-                 Cite          = (1<<15)
+                 Details       = (1<<15),
+                 Summary       = (1<<16),
+                 Cite          = (1<<17)
                };
 
     DocStyleChange(DocParser *parser,DocNodeVariant *parent,size_t position,Style s,
@@ -792,35 +793,6 @@ class DocHRef : public DocCompoundNode
     QCString   m_file;
 };
 
-/** Node Html summary */
-class DocHtmlSummary : public DocCompoundNode
-{
-  public:
-    DocHtmlSummary(DocParser *parser,DocNodeVariant *parent,const HtmlAttribList &attribs) :
-       DocCompoundNode(parser,parent), m_attribs(attribs) {}
-    const HtmlAttribList &attribs() const { return m_attribs; }
-    void parse(DocNodeVariant*);
-
-  private:
-    HtmlAttribList m_attribs;
-};
-
-/** Node Html details */
-class DocHtmlDetails : public DocCompoundNode
-{
-  public:
-    DocHtmlDetails(DocParser *parser,DocNodeVariant *parent,const HtmlAttribList &attribs) :
-       DocCompoundNode(parser,parent), m_attribs(attribs) {}
-    const HtmlAttribList &attribs() const { return m_attribs; }
-    int parse(DocNodeVariant*);
-    void parseSummary(DocNodeVariant *,HtmlAttribList &attribs);
-    const DocNodeVariant *summary() const { return m_summary.get(); }
-
-  private:
-    HtmlAttribList m_attribs;
-    std::unique_ptr<DocNodeVariant> m_summary;
-};
-
 /** Node Html heading */
 class DocHtmlHeader : public DocCompoundNode
 {
@@ -1057,9 +1029,7 @@ class DocPara : public DocCompoundNode
     void handleSection(DocNodeVariant *thisVariant,const QCString &cmdName);
     void handleInheritDoc(DocNodeVariant *thisVariant);
     void handleVhdlFlow(DocNodeVariant *thisVariant);
-    void handleILine(DocNodeVariant *thisVariant);
-    void handleIFile(DocNodeVariant *thisVariant);
-    void handleShowDate(DocNodeVariant *thisVariant);
+    void handleIline(DocNodeVariant *thisVariant);
     int handleStartCode(DocNodeVariant *thisVariant);
     int handleHtmlHeader(DocNodeVariant *thisVariant,const HtmlAttribList &tagHtmlAttribs,int level);
 
@@ -1068,6 +1038,7 @@ class DocPara : public DocCompoundNode
     void setAttribs(const HtmlAttribList &attribs) { m_attribs = attribs; }
 
   private:
+    QCString  m_sectionId;
     bool      m_isFirst = false;
     bool      m_isLast = false;
     HtmlAttribList m_attribs;
@@ -1280,12 +1251,6 @@ class DocRoot : public DocCompoundNode
 //--------------------------------------------------------------------------------------
 
 /// returns the parent node of a given node \a n or 0 if the node has no parent.
-constexpr DocNodeVariant *parent(DocNodeVariant *n)
-{
-  return n ? std::visit([](auto &&x)->decltype(auto) { return x.parent(); }, *n) : nullptr;
-}
-
-/// returns the parent node of a given node \a n or 0 if the node has no parent.
 constexpr const DocNodeVariant *parent(const DocNodeVariant *n)
 {
   return n ? std::visit([](auto &&x)->decltype(auto) { return x.parent(); }, *n) : nullptr;
@@ -1345,17 +1310,17 @@ inline T *DocNodeList::get_last()
   return std::get_if<T>(&back());
 }
 
-// ---------------- Debug helpers -------------------------------
+/// ---------------- Debug helpers -------------------------------
 
-#define DN(x)  #x
-#define DN_SEP ,
 inline const char *docNodeName(const DocNodeVariant &v)
 {
+#define DN(x)  #x
+#define DN_SEP ,
   static const char *table[] = { DOC_NODES };
-  return table[v.index()];
-}
 #undef DN
 #undef DN_SEP
+  return table[v.index()];
+}
 
 inline void dumpDocNodeSizes()
 {

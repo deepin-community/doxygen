@@ -84,7 +84,6 @@ class HtmlGenerator : public OutputGenerator
     static QCString writeLogoAsString(const QCString &path);
     static QCString writeSplitBarAsString(const QCString &name,const QCString &relpath);
     static QCString getMathJaxMacros();
-    static QCString getNavTreeCss();
 
     // ---- CodeOutputInterface
     void codify(const QCString &text)

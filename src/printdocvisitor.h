@@ -147,6 +147,30 @@ class PrintDocVisitor
         case DocStyleChange::Span:
           if (s.enable()) printf("<span>"); else printf("</span>");
           break;
+        case DocStyleChange::Details:
+          if (s.enable())
+          {
+            indent_pre();
+            printf("<details>\n");
+          }
+          else
+          {
+            indent_post();
+            printf("</details>\n");
+          }
+          break;
+        case DocStyleChange::Summary:
+          if (s.enable())
+          {
+            indent_pre();
+            printf("<summary>\n");
+          }
+          else
+          {
+            indent_post();
+            printf("</summary>\n");
+          }
+          break;
       }
     }
     void operator()(const DocVerbatim &s)
@@ -505,37 +529,6 @@ class PrintDocVisitor
       visitChildren(href);
       indent_post();
       printf("</a>\n");
-    }
-    void operator()(const DocHtmlSummary &summary)
-    {
-      indent_pre();
-      printf("<summary");
-      for (const auto &opt : summary.attribs())
-      {
-        printf(" %s=\"%s\"",qPrint(opt.name),qPrint(opt.value));
-      }
-      printf(">\n");
-      visitChildren(summary);
-      indent_post();
-      printf("</summary>\n");
-    }
-    void operator()(const DocHtmlDetails &details)
-    {
-      indent_pre();
-      printf("<details");
-      for (const auto &opt : details.attribs())
-      {
-        printf(" %s=\"%s\"",qPrint(opt.name),qPrint(opt.value));
-      }
-      printf(">\n");
-      auto summary = details.summary();
-      if (summary)
-      {
-        std::visit(*this,*summary);
-      }
-      visitChildren(details);
-      indent_post();
-      printf("</details>\n");
     }
     void operator()(const DocHtmlHeader &header)
     {

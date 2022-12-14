@@ -1221,7 +1221,7 @@ class FilterRelative
   public:
     static TemplateVariant apply(const TemplateVariant &v,const TemplateVariant &)
     {
-      if (v.isValid() && v.isString() && v.toString().startsWith(".."))
+      if (v.isValid() && v.isString() && v.toString().left(2)=="..")
       {
         return TRUE;
       }
@@ -3123,7 +3123,7 @@ class TemplateNodeIf : public TemplateNodeCreator<TemplateNodeIf>
       auto tok = parser->takeNextToken();
 
       // elif 'nodes'
-      while (tok && tok->data.startsWith("elif "))
+      while (tok && tok->data.left(5)=="elif ")
       {
         m_ifGuardedNodes.push_back(std::make_unique<GuardedNodes>());
         auto &guardedNodes = m_ifGuardedNodes.back();
