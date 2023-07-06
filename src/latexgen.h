@@ -23,40 +23,48 @@
 
 #define LATEX_STYLE_EXTENSION ".sty"
 
-class TextStream;
+class OutputCodeList;
 
-class LatexCodeGenerator : public CodeOutputInterface
+/** Generator for LaTeX code fragments */
+class LatexCodeGenerator
 {
   public:
-    LatexCodeGenerator(TextStream &t,const QCString &relPath,const QCString &sourceFile);
-    LatexCodeGenerator(TextStream &t);
-    void setRelativePath(const QCString &path);
-    void setSourceFileName(const QCString &sourceFileName);
-    void codify(const QCString &text) override;
+    LatexCodeGenerator(TextStream *t,const QCString &relPath,const QCString &sourceFile);
+    LatexCodeGenerator(TextStream *t);
+    void setTextStream(TextStream *t) { m_t = t; }
+
+    OutputType type() const { return OutputType::Latex; }
+
+    void codify(const QCString &text);
     void writeCodeLink(CodeSymbolType type,
                        const QCString &ref,const QCString &file,
                        const QCString &anchor,const QCString &name,
-                       const QCString &tooltip) override;
+                       const QCString &tooltip);
     void writeTooltip(const QCString &,
                       const DocLinkInfo &,
                       const QCString &,
                       const QCString &,
                       const SourceLinkInfo &,
                       const SourceLinkInfo &
-                     )  override{}
-    void writeLineNumber(const QCString &,const QCString &,const QCString &,int,bool) override;
-    void startCodeLine(bool) override;
-    void endCodeLine() override;
-    void startFontClass(const QCString &) override;
-    void endFontClass() override;
-    void writeCodeAnchor(const QCString &) override {}
-    void startCodeFragment(const QCString &style) override;
-    void endCodeFragment(const QCString &style) override;
+                     )  {}
+    void writeLineNumber(const QCString &,const QCString &,const QCString &,int,bool);
+    void startCodeLine(bool);
+    void endCodeLine();
+    void startFontClass(const QCString &);
+    void endFontClass();
+    void writeCodeAnchor(const QCString &) {}
+    void startCodeFragment(const QCString &style);
+    void endCodeFragment(const QCString &style);
 
     // extra methods not part of CodeOutputInterface
     void incUsedTableLevel() { m_usedTableLevel++; }
     void decUsedTableLevel() { m_usedTableLevel--; }
     int usedTableLevel() const { return m_usedTableLevel; }
+
+    void setRelativePath(const QCString &path);
+    void setSourceFileName(const QCString &sourceFileName);
+    void setInsideTabbing(bool b) { m_insideTabbing=b; }
+    bool insideTabbing() const { return m_insideTabbing; }
 
   private:
     void _writeCodeLink(const QCString &className,
@@ -65,12 +73,13 @@ class LatexCodeGenerator : public CodeOutputInterface
                         const QCString &tooltip);
     void docify(const QCString &str);
     bool m_streamSet = false;
-    TextStream &m_t;
+    TextStream *m_t;
     QCString m_relPath;
     QCString m_sourceFileName;
     int m_col = 0;
     bool m_doxyCodeLineOpen = false;
     int m_usedTableLevel = 0;
+    bool m_insideTabbing = false;
 };
 
 /** Generator for LaTeX output. */
@@ -80,8 +89,10 @@ class LatexGenerator : public OutputGenerator
     LatexGenerator();
     LatexGenerator(const LatexGenerator &);
     LatexGenerator &operator=(const LatexGenerator &);
-    virtual ~LatexGenerator();
-    virtual std::unique_ptr<OutputGenerator> clone() const;
+    LatexGenerator(LatexGenerator &&);
+    LatexGenerator &operator=(LatexGenerator &&) = delete;
+   ~LatexGenerator();
+    OutputType type() const { return OutputType::Latex; }
 
     static void init();
     void cleanup();
@@ -89,59 +100,25 @@ class LatexGenerator : public OutputGenerator
     static void writeHeaderFile(TextStream &t);
     static void writeFooterFile(TextStream &t);
 
-    virtual OutputType type() const { return Latex; }
-
-    // --- CodeOutputInterface
-    void codify(const QCString &text)
-    { m_codeGen.codify(text); }
-    void writeCodeLink(CodeSymbolType type,
-                       const QCString &ref, const QCString &file,
-                       const QCString &anchor,const QCString &name,
-                       const QCString &tooltip)
-    { m_codeGen.writeCodeLink(type,ref,file,anchor,name,tooltip); }
-    void writeLineNumber(const QCString &ref,const QCString &file,const QCString &anchor,int lineNumber, bool writeLineAnchor)
-    { m_codeGen.writeLineNumber(ref,file,anchor,lineNumber,writeLineAnchor); }
-    void writeTooltip(const QCString &id, const DocLinkInfo &docInfo, const QCString &decl,
-                      const QCString &desc, const SourceLinkInfo &defInfo, const SourceLinkInfo &declInfo
-                     )
-    { m_codeGen.writeTooltip(id,docInfo,decl,desc,defInfo,declInfo); }
-    void startCodeLine(bool hasLineNumbers)
-    { m_codeGen.startCodeLine(hasLineNumbers); }
-    void endCodeLine()
-    { m_codeGen.endCodeLine(); }
-    void startFontClass(const QCString &s)
-    { m_codeGen.startFontClass(s); }
-    void endFontClass()
-    { m_codeGen.endFontClass(); }
-    void writeCodeAnchor(const QCString &anchor)
-    { m_codeGen.writeCodeAnchor(anchor); }
-    void startCodeFragment(const QCString &style)
-    { m_codeGen.startCodeFragment(style); }
-    void endCodeFragment(const QCString &style)
-    { m_codeGen.endCodeFragment(style); }
-    // ---------------------------
-
-
     void writeDoc(const IDocNodeAST *node,const Definition *ctx,const MemberDef *,int id);
 
-    void startFile(const QCString &name,const QCString &manName,const QCString &title,int id);
+    void startFile(const QCString &name,const QCString &manName,const QCString &title,int id,int hierarchyLevel);
     void writeSearchInfo() {}
     void writeFooter(const QCString &) {}
     void endFile();
     void clearBuffer();
 
-    void startIndexSection(IndexSections);
-    void endIndexSection(IndexSections);
+    void startPageDoc(const QCString &) {}
+    void endPageDoc() {}
+    void startIndexSection(IndexSection);
+    void endIndexSection(IndexSection);
     void writePageLink(const QCString &,bool);
     void startProjectNumber();
     void endProjectNumber() {}
     void writeStyleInfo(int part);
     void startTitleHead(const QCString &);
-    void startTitle();
     void endTitleHead(const QCString &,const QCString &name);
-    void endTitle()   { m_t << "}"; }
 
-    void newParagraph();
     void startParagraph(const QCString &classDef);
     void endParagraph();
     void writeString(const QCString &text);
@@ -163,8 +140,6 @@ class LatexGenerator : public OutputGenerator
 
     void startTextLink(const QCString &,const QCString &);
     void endTextLink();
-    void startHtmlLink(const QCString &url);
-    void endHtmlLink();
     void startTypewriter() { m_t << "{\\ttfamily "; }
     void endTypewriter()   { m_t << "}";      }
     void startGroupHeader(int);
@@ -188,12 +163,12 @@ class LatexGenerator : public OutputGenerator
     void endInlineHeader();
     void startAnonTypeScope(int);
     void endAnonTypeScope(int);
-    void startMemberItem(const QCString &,int,const QCString &);
-    void endMemberItem();
+    void startMemberItem(const QCString &,MemberItemType,const QCString &);
+    void endMemberItem(MemberItemType);
     void startMemberTemplateParams();
     void endMemberTemplateParams(const QCString &,const QCString &);
-    void startCompoundTemplateParams() { startSubsubsection(); }
-    void endCompoundTemplateParams() { endSubsubsection(); }
+    void startCompoundTemplateParams() { m_t << "\\subsubsection*{";}
+    void endCompoundTemplateParams()   { m_t << "}\n"; }
 
     void startMemberGroupHeader(bool);
     void endMemberGroupHeader();
@@ -203,7 +178,7 @@ class LatexGenerator : public OutputGenerator
     void endMemberGroup(bool);
 
     void insertMemberAlign(bool) {}
-    void insertMemberAlignLeft(int,bool){}
+    void insertMemberAlignLeft(MemberItemType,bool){}
 
     void writeRuler() { m_t << "\n\n"; }
     void writeAnchor(const QCString &fileName,const QCString &name);
@@ -211,10 +186,6 @@ class LatexGenerator : public OutputGenerator
     void endEmphasis()   { m_t << "}"; }
     void startBold()     { m_t << "{\\bfseries "; }
     void endBold()       { m_t << "}"; }
-    void startDescription();
-    void endDescription();
-    void startDescItem();
-    void endDescItem();
     void lineBreak(const QCString &style=QCString());
     void startMemberDoc(const QCString &,const QCString &,const QCString &,const QCString &,int,int,bool);
     void endMemberDoc(bool);
@@ -224,11 +195,6 @@ class LatexGenerator : public OutputGenerator
     void writeLatexSpacing() { m_t << "\\hspace{0.3cm}"; }
     void writeStartAnnoItem(const QCString &type,const QCString &file,
                             const QCString &path,const QCString &name);
-    void writeEndAnnoItem(const QCString &name);
-    void startSubsection() { m_t << "\\subsection*{"; }
-    void endSubsection() { m_t << "}\n"; }
-    void startSubsubsection() { m_t << "\\subsubsection*{"; }
-    void endSubsubsection() { m_t << "}\n"; }
     void startCenter()      { m_t << "\\begin{center}\n"; }
     void endCenter()        { m_t << "\\end{center}\n"; }
     void startSmall()       { m_t << "\\footnotesize "; }
@@ -238,13 +204,9 @@ class LatexGenerator : public OutputGenerator
     void startMemberDeclaration() {}
     void endMemberDeclaration(const QCString &,const QCString &) {}
     void writeInheritedSectionTitle(const QCString &,const QCString &,const QCString &,
-                      const QCString &,const QCString &,const QCString &) {}
-    void startDescList(SectionTypes)     { m_t << "\\begin{Desc}\n\\item["; }
-    void endDescList()       { m_t << "\\end{Desc}\n"; }
+                      const QCString &,const QCString &,const QCString &);
     void startExamples();
     void endExamples();
-    void startParamList(ParamListTypes,const QCString &title);
-    void endParamList();
     void startDescForItem()     { m_t << "\\par\n"; }
     void endDescForItem()       {}
     void startSection(const QCString &,const QCString &,SectionType);
@@ -327,18 +289,44 @@ class LatexGenerator : public OutputGenerator
     void writeLabel(const QCString &l,bool isLast);
     void endLabels();
 
+    void writeLocalToc(const SectionRefs &sr,const LocalToc &lt);
+
     void setCurrentDoc(const Definition *,const QCString &,bool) {}
     void addWord(const QCString &,bool) {}
 
+    void addCodeGen(OutputCodeList &list);
 
   private:
-    bool m_insideTabbing = false;
+    void startTitle();
+    void endTitle()   { m_t << "}"; }
+
     bool m_firstDescItem = true;
     bool m_disableLinks = false;
     QCString m_relPath;
     int m_indent = 0;
-    bool templateMemberItem = false;
-    LatexCodeGenerator m_codeGen;
+    bool m_templateMemberItem = false;
+    std::unique_ptr<OutputCodeList> m_codeList;
+    LatexCodeGenerator *m_codeGen;
+    bool m_insideTableEnv = false;
+    int m_hierarchyLevel = 0;
 };
+
+void writeExtraLatexPackages(TextStream &t);
+void writeLatexSpecialFormulaChars(TextStream &t);
+QCString convertToLaTeX(const QCString &s,bool insideTabbing,bool keepSpaces=FALSE);
+
+void filterLatexString(TextStream &t,const QCString &str,
+                       bool insideTabbing,
+                       bool insidePre,
+                       bool insideItem,
+                       bool insideTable,
+                       bool keepSpaces,
+                       const bool retainNewline = false);
+
+QCString latexEscapeLabelName(const QCString &s);
+QCString latexEscapeIndexChars(const QCString &s);
+QCString latexEscapePDFString(const QCString &s);
+QCString latexFilterURL(const QCString &s);
+
 
 #endif

@@ -1,11 +1,5 @@
+0001-avoid-compass.patch
+0002-add-dot-config-support.patch
+0003-faketime-pdflatex.patch
 manpages.diff
-dot-config.diff
-no-timestamps.diff
-avoid-compass.diff
-fix-pdflatex-invocation.diff
-faketime_pdflatex.diff
-libatomic.diff
-reproducible_manpages.diff
 sass_fix.diff
-gcc12.diff
-example.patch

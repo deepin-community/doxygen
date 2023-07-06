@@ -1,0 +1,41 @@
+From 3699f44fbe67a3923db38688dd85d9e8e1ca0ee4 Mon Sep 17 00:00:00 2001
+From: xzl <xiangzelong@deepin.org>
+Date: Mon, 10 Jul 2023 11:16:59 +0800
+Subject: [PATCH] add-dot-config-support
+
+---
+ src/config.xml | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/config.xml b/src/config.xml
+index 13910958..20d430b9 100644
+--- a/src/config.xml
++++ b/src/config.xml
+@@ -3663,7 +3663,7 @@ where `loc1` and `loc2` can be relative or absolute paths or URLs.
+ ]]>
+       </docs>
+     </option>
+-    <option type='bool' id='HAVE_DOT' defval='0'>
++    <option type='bool' id='HAVE_DOT' defval='1'>
+       <docs>
+ <![CDATA[
+  If you set the \c HAVE_DOT tag to \c YES then doxygen will assume the \c dot tool is
+@@ -3916,7 +3916,15 @@ UML notation for the relationships.
+       </docs>
+       <value name='png'/>
+       <value name='jpg'/>
++      <value name='jpg:cairo'/>
++      <value name='jpg:cairo:gd'/>
++      <value name='jpg:gd'/>
++      <value name='jpg:gd:gd'/>
+       <value name='gif'/>
++      <value name='gif:cairo'/>
++      <value name='gif:cairo:gd'/>
++      <value name='gif:gd'/>
++      <value name='gif:gd:gd'/>
+       <value name='svg'/>
+       <value name='png:gd'/>
+       <value name='png:gd:gd'/>
+-- 
+2.41.0
+

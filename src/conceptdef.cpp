@@ -84,11 +84,11 @@ class ConceptDefImpl : public DefinitionMixin<ConceptDefMutable>
     int                          m_groupId = -1;
 };
 
-ConceptDefMutable *createConceptDef(
+std::unique_ptr<ConceptDef> createConceptDef(
              const QCString &fileName,int startLine,int startColumn,
              const QCString &name, const QCString &tagRef,const QCString &tagFile)
 {
-  return new ConceptDefImpl(fileName,startLine,startColumn,name,tagRef,tagFile);
+  return std::make_unique<ConceptDefImpl>(fileName,startLine,startColumn,name,tagRef,tagFile);
 }
 
 //------------------------------------------------------------------------------------
@@ -141,10 +141,9 @@ class ConceptDefAliasImpl : public DefinitionAliasMixin<ConceptDef>
     { return getCdAlias()->groupId(); }
 };
 
-ConceptDef *createConceptDefAlias(const Definition *newScope,const ConceptDef *cd)
+std::unique_ptr<ConceptDef> createConceptDefAlias(const Definition *newScope,const ConceptDef *cd)
 {
-  ConceptDef *acd = new ConceptDefAliasImpl(newScope,cd);
-  return acd;
+  return std::make_unique<ConceptDefAliasImpl>(newScope,cd);
 }
 
 //------------------------------------------------------------------------------------
@@ -215,7 +214,10 @@ ArgumentList ConceptDefImpl::getTemplateParameterList() const
 
 bool ConceptDefImpl::isLinkableInProject() const
 {
-  return hasDocumentation() && !isReference() && !isHidden();
+  bool hideUndoc = Config_getBool(HIDE_UNDOC_CLASSES);
+  return (hasDocumentation() || !hideUndoc) && /* documented */
+         !isHidden() &&                        /* not hidden */
+         !isReference();                       /* not an external reference */
 }
 
 bool ConceptDefImpl::isLinkable() const
@@ -285,7 +287,9 @@ void ConceptDefImpl::writeTagFile(TextStream &tagFile)
 {
   tagFile << "  <compound kind=\"concept\">\n";
   tagFile << "    <name>" << convertToXML(name()) << "</name>\n";
-  tagFile << "    <filename>" << convertToXML(addHtmlExtensionIfMissing(getOutputFileBase())) << "</filename>\n";
+  QCString fn = getOutputFileBase();
+  addHtmlExtensionIfMissing(fn);
+  tagFile << "    <filename>" << convertToXML(fn) << "</filename>\n";
   QCString idStr = id();
   if (!idStr.isEmpty())
   {
@@ -308,18 +312,18 @@ void ConceptDefImpl::writeBriefDescription(OutputList &ol) const
     {
       ol.startParagraph();
       ol.pushGeneratorState();
-      ol.disableAllBut(OutputGenerator::Man);
+      ol.disableAllBut(OutputType::Man);
       ol.writeString(" - ");
       ol.popGeneratorState();
       ol.writeDoc(ast.get(),this,0);
       ol.pushGeneratorState();
-      ol.disable(OutputGenerator::RTF);
+      ol.disable(OutputType::RTF);
       ol.writeString(" \n");
-      ol.enable(OutputGenerator::RTF);
+      ol.enable(OutputType::RTF);
 
       if (hasDetailedDescription())
       {
-        ol.disableAllBut(OutputGenerator::Html);
+        ol.disableAllBut(OutputType::Html);
         ol.startTextLink(getOutputFileBase(),"details");
         ol.parseText(theTranslator->trMore());
         ol.endTextLink();
@@ -350,10 +354,10 @@ void ConceptDefImpl::writeIncludeFiles(OutputList &ol) const
       else
         ol.docify("<");
       ol.pushGeneratorState();
-      ol.disable(OutputGenerator::Html);
+      ol.disable(OutputType::Html);
       ol.docify(nm);
-      ol.disableAllBut(OutputGenerator::Html);
-      ol.enable(OutputGenerator::Html);
+      ol.disableAllBut(OutputType::Html);
+      ol.enable(OutputType::Html);
       if (m_incInfo->fileDef)
       {
         ol.writeObjectLink(QCString(),m_incInfo->fileDef->includeName(),QCString(),nm);
@@ -414,14 +418,15 @@ void ConceptDefImpl::writeDefinition(OutputList &ol,const QCString &title) const
 
     auto intf = Doxygen::parserManager->getCodeParser(".cpp");
     intf->resetCodeParserState();
-    ol.startCodeFragment("DoxyCode");
+    auto &codeOL = ol.codeGenerators();
+    codeOL.startCodeFragment("DoxyCode");
     QCString scopeName;
     if (getOuterScope()!=Doxygen::globalScope) scopeName=getOuterScope()->name();
     TextStream conceptDef;
     conceptDef << m_initializer;
-    intf->parseCode(ol,scopeName,conceptDef.str(),SrcLangExt_Cpp,false,QCString(),
+    intf->parseCode(codeOL,scopeName,conceptDef.str(),SrcLangExt_Cpp,false,QCString(),
                     m_fileDef, -1,-1,true,0,false,this);
-    ol.endCodeFragment("DoxyCode");
+    codeOL.endCodeFragment("DoxyCode");
 }
 
 void ConceptDefImpl::writeDetailedDescription(OutputList &ol,const QCString &title) const
@@ -430,12 +435,12 @@ void ConceptDefImpl::writeDetailedDescription(OutputList &ol,const QCString &tit
   if (hasDetailedDescription())
   {
     ol.pushGeneratorState();
-      ol.disable(OutputGenerator::Html);
+      ol.disable(OutputType::Html);
       ol.writeRuler();
     ol.popGeneratorState();
 
     ol.pushGeneratorState();
-      ol.disableAllBut(OutputGenerator::Html);
+      ol.disableAllBut(OutputType::Html);
       ol.writeAnchor(QCString(),"details");
     ol.popGeneratorState();
 
@@ -454,7 +459,7 @@ void ConceptDefImpl::writeDetailedDescription(OutputList &ol,const QCString &tit
         !documentation().isEmpty())
     {
       ol.pushGeneratorState();
-      ol.disable(OutputGenerator::Html);
+      ol.disable(OutputType::Html);
       ol.writeString("\n\n");
       ol.popGeneratorState();
     }
@@ -475,7 +480,7 @@ void ConceptDefImpl::writeAuthorSection(OutputList &ol) const
 {
   // write Author section (Man only)
   ol.pushGeneratorState();
-  ol.disableAllBut(OutputGenerator::Man);
+  ol.disableAllBut(OutputType::Man);
   ol.startGroupHeader();
   ol.parseText(theTranslator->trAuthor(TRUE,TRUE));
   ol.endGroupHeader();
@@ -487,7 +492,7 @@ void ConceptDefImpl::writeDocumentation(OutputList &ol)
 {
   bool generateTreeView = Config_getBool(GENERATE_TREEVIEW);
   QCString pageTitle = theTranslator->trConceptReference(displayName());
-  startFile(ol,getOutputFileBase(),name(),pageTitle,HLI_ConceptVisible,!generateTreeView);
+  startFile(ol,getOutputFileBase(),name(),pageTitle,HighlightedItem::ConceptVisible,!generateTreeView);
 
   // ---- navigation part
   if (!generateTreeView)
@@ -586,7 +591,7 @@ void ConceptDefImpl::writeDocumentation(OutputList &ol)
 
   ol.endContents();
 
-  endFileWithNavPath(this,ol);
+  endFileWithNavPath(ol,this);
 }
 
 void ConceptDefImpl::writeDeclarationLink(OutputList &ol,bool &found,const QCString &header,bool localNames) const
@@ -609,7 +614,7 @@ void ConceptDefImpl::writeDeclarationLink(OutputList &ol,bool &found,const QCStr
       found=TRUE;
     }
     ol.startMemberDeclaration();
-    ol.startMemberItem(anchor(),FALSE);
+    ol.startMemberItem(anchor(),OutputGenerator::MemberItemType::Normal);
     ol.writeString("concept ");
     QCString cname = displayName(!localNames);
     ol.insertMemberAlign();
@@ -627,7 +632,7 @@ void ConceptDefImpl::writeDeclarationLink(OutputList &ol,bool &found,const QCStr
       ol.docify(cname);
       ol.endBold();
     }
-    ol.endMemberItem();
+    ol.endMemberItem(OutputGenerator::MemberItemType::Normal);
     // add the brief description if available
     if (!briefDescription().isEmpty() && Config_getBool(BRIEF_MEMBER_DESC))
     {
