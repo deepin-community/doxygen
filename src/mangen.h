@@ -20,38 +20,76 @@
 
 #include "outputgen.h"
 
+class OutputCodeList;
+
+/** Generator for Man page code fragments */
+class ManCodeGenerator
+{
+  public:
+    ManCodeGenerator(TextStream *t);
+    void setTextStream(TextStream *t) { m_t = t; }
+
+    OutputType type() const { return OutputType::Man; }
+
+    void codify(const QCString &text);
+    void writeCodeLink(CodeSymbolType type,
+                       const QCString &ref,const QCString &file,
+                       const QCString &anchor,const QCString &name,
+                       const QCString &tooltip);
+    void writeTooltip(const QCString &,
+                      const DocLinkInfo &,
+                      const QCString &,
+                      const QCString &,
+                      const SourceLinkInfo &,
+                      const SourceLinkInfo &
+                     ) {}
+    void writeLineNumber(const QCString &,const QCString &,const QCString &,int l, bool);
+    void startCodeLine(bool) {}
+    void endCodeLine() { codify("\n"); m_col=0; }
+    void startFontClass(const QCString &) {}
+    void endFontClass() {}
+    void writeCodeAnchor(const QCString &) {}
+    void startCodeFragment(const QCString &style);
+    void endCodeFragment(const QCString &);
+
+  private:
+    int  m_col = 0;
+    TextStream *m_t;
+};
+
 /** Generator for Man page output. */
 class ManGenerator : public OutputGenerator
 {
   public:
     ManGenerator();
-    ManGenerator(const ManGenerator &g);
-    ManGenerator &operator=(const ManGenerator &g);
-    virtual ~ManGenerator();
-    virtual std::unique_ptr<OutputGenerator> clone() const;
+    ManGenerator(const ManGenerator &);
+    ManGenerator &operator=(const ManGenerator &);
+    ManGenerator(ManGenerator &&);
+    ManGenerator &operator=(ManGenerator &&) = delete;
+   ~ManGenerator();
 
-    OutputType type() const { return Man; }
+    OutputType type() const { return OutputType::Man; }
 
     void writeDoc(const IDocNodeAST *ast,const Definition *,const MemberDef *,int);
 
     static void init();
     void cleanup();
-    void startFile(const QCString &name,const QCString &manName,const QCString &title,int);
+    void startFile(const QCString &name,const QCString &manName,const QCString &title,int id, int hierarchyLevel);
     void writeSearchInfo() {}
     void writeFooter(const QCString &) {}
     void endFile();
     void clearBuffer();
 
-    void startIndexSection(IndexSections) {}
-    void endIndexSection(IndexSections) {}
+    void startPageDoc(const QCString &) {}
+    void endPageDoc() {}
+    void startIndexSection(IndexSection) {}
+    void endIndexSection(IndexSection) {}
     void writePageLink(const QCString &,bool) {}
     void startProjectNumber() {}
     void endProjectNumber() {}
     void writeStyleInfo(int) {}
     void startTitleHead(const QCString &) {}
     void endTitleHead(const QCString &,const QCString &);
-    void startTitle();
-    void endTitle();
 
     void newParagraph();
     void startParagraph(const QCString &classDef);
@@ -70,20 +108,10 @@ class ManGenerator : public OutputGenerator
     void startIndexItem(const QCString &ref,const QCString &file);
     void endIndexItem(const QCString &ref,const QCString &file);
     void docify(const QCString &text);
-    void codify(const QCString &text);
     void writeObjectLink(const QCString &ref,const QCString &file,
                          const QCString &anchor,const QCString &name);
-    void writeCodeLink(CodeSymbolType type,
-                       const QCString &ref,const QCString &file,
-                       const QCString &anchor,const QCString &name,
-                       const QCString &tooltip);
-    void writeTooltip(const QCString &, const DocLinkInfo &, const QCString &,
-                      const QCString &, const SourceLinkInfo &, const SourceLinkInfo &
-                     ) {}
     void startTextLink(const QCString &,const QCString &) {}
     void endTextLink() {}
-    void startHtmlLink(const QCString &url);
-    void endHtmlLink();
     void startTypewriter() { m_t << "\\fC"; m_firstCol=FALSE; }
     void endTypewriter()   { m_t << "\\fP"; m_firstCol=FALSE; }
     void startGroupHeader(int);
@@ -95,7 +123,7 @@ class ManGenerator : public OutputGenerator
     void startMemberHeader(const QCString &,int);
     void endMemberHeader();
     void insertMemberAlign(bool) {}
-    void insertMemberAlignLeft(int,bool){}
+    void insertMemberAlignLeft(MemberItemType,bool){}
     void startMemberSubtitle() {}
     void endMemberSubtitle() {}
     void startItemListItem();
@@ -108,12 +136,12 @@ class ManGenerator : public OutputGenerator
     void endInlineHeader();
     void startAnonTypeScope(int);
     void endAnonTypeScope(int);
-    void startMemberItem(const QCString &,int,const QCString &);
-    void endMemberItem();
+    void startMemberItem(const QCString &,MemberItemType,const QCString &);
+    void endMemberItem(MemberItemType);
     void startMemberTemplateParams() {}
     void endMemberTemplateParams(const QCString &,const QCString &) {}
-    void startCompoundTemplateParams() { startSubsubsection(); }
-    void endCompoundTemplateParams() { endSubsubsection(); }
+    void startCompoundTemplateParams();
+    void endCompoundTemplateParams();
 
     void startMemberGroupHeader(bool);
     void endMemberGroupHeader();
@@ -124,19 +152,10 @@ class ManGenerator : public OutputGenerator
 
     void writeRuler()    {}
     void writeAnchor(const QCString &,const QCString &) {}
-    void startCodeFragment(const QCString &);
-    void endCodeFragment(const QCString &);
-    void writeLineNumber(const QCString &,const QCString &,const QCString &,int l, bool) { m_t << l << " "; m_col=0; }
-    void startCodeLine(bool) {}
-    void endCodeLine() { codify("\n"); m_col=0; }
     void startEmphasis() { m_t << "\\fI"; m_firstCol=FALSE; }
     void endEmphasis()   { m_t << "\\fP"; m_firstCol=FALSE; }
     void startBold()     { m_t << "\\fB"; m_firstCol=FALSE; }
     void endBold()       { m_t << "\\fP"; m_firstCol=FALSE; }
-    void startDescription() {}
-    void endDescription()   {}
-    void startDescItem();
-    void endDescItem();
     void lineBreak(const QCString &) { m_t << "\n.br\n"; }
     void writeChar(char c);
     void startMemberDoc(const QCString &,const QCString &,const QCString &,const QCString &,int,int,bool);
@@ -146,11 +165,6 @@ class ManGenerator : public OutputGenerator
     void writeLatexSpacing() {}
     void writeStartAnnoItem(const QCString &type,const QCString &file,
                             const QCString &path,const QCString &name);
-    void writeEndAnnoItem(const QCString &) { m_t << "\n"; m_firstCol=TRUE; }
-    void startSubsection();
-    void endSubsection();
-    void startSubsubsection();
-    void endSubsubsection();
     void startCenter()        {}
     void endCenter()          {}
     void startSmall()         {}
@@ -160,13 +174,9 @@ class ManGenerator : public OutputGenerator
     void startMemberDeclaration() {}
     void endMemberDeclaration(const QCString &,const QCString &) {}
     void writeInheritedSectionTitle(const QCString &,const QCString &,const QCString &,
-                      const QCString &,const QCString &,const QCString &) {}
-    void startDescList(SectionTypes);
-    void endDescList()        {}
+                      const QCString &,const QCString &,const QCString &);
     void startExamples();
     void endExamples();
-    void startParamList(ParamListTypes,const QCString &title);
-    void endParamList();
     void startDescForItem();
     void endDescForItem();
     void startSection(const QCString &,const QCString &,SectionType);
@@ -252,15 +262,22 @@ class ManGenerator : public OutputGenerator
     void writeLabel(const QCString &l,bool isLast);
     void endLabels();
 
-    void writeCodeAnchor(const QCString &) {}
+    void writeLocalToc(const SectionRefs &,const LocalToc &) {}
+
+    void addCodeGen(OutputCodeList &list);
 
   private:
+    void startTitle();
+    void endTitle();
+
     bool m_firstCol = true;
-    bool m_paragraph = true;
     int  m_col = 0;
+    bool m_paragraph = true;
     bool m_upperCase = false;
     bool m_insideTabbing = false;
     bool m_inHeader = false;
+    std::unique_ptr<OutputCodeList> m_codeList;
+    ManCodeGenerator *m_codeGen;
 
 };
 

@@ -22,7 +22,6 @@
 {% resource 'doxygen.svg' %}
 {% resource 'closed.luma' %}
 {% resource 'open.luma' %}
-{% resource 'bdwn.luma' %}
 {% resource 'sync_on.luma' %}
 {% resource 'sync_off.luma' %}
 
@@ -38,15 +37,12 @@
 {% if not config.DISABLE_INDEX and config.HTML_DYNAMIC_MENUS %}
 {% resource 'menu.js' %}
 {% endif %}
-{% resource 'doc.luma' %}
-{% resource 'folderopen.luma' %}
-{% resource 'folderclosed.luma' %}
+{% resource 'doc.svg' %}
+{% resource 'folderopen.svg' %}
+{% resource 'folderclosed.svg' %}
 {% resource 'splitbar.lum' %}
 
 {# general search resources #}
-{% resource 'search_l.png' as 'search/search_l.png' %}
-{% resource 'search_m.png' as 'search/search_m.png' %}
-{% resource 'search_r.png' as 'search/search_r.png' %}
 {% if config.DISABLE_INDEX %}
   {% if config.GENERATE_TREEVIEW and config.FULL_SIDEBAR %}
   {% resource 'search_sidebar.css'   as 'search/search.css'   %}

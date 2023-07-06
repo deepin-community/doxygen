@@ -13,8 +13,6 @@
  *
  */
 
-#include <fstream>
-
 #include "docbookvisitor.h"
 #include "docparser.h"
 #include "language.h"
@@ -35,6 +33,7 @@
 #include "plantuml.h"
 #include "growbuf.h"
 #include "fileinfo.h"
+#include "portable.h"
 
 #if 0
 #define DB_VIS_C DB_VIS_C1(m_t)
@@ -153,7 +152,7 @@ void DocbookDocVisitor::visitPostEnd(TextStream &t, bool hasCaption, bool inline
   }
 }
 
-DocbookDocVisitor::DocbookDocVisitor(TextStream &t,CodeOutputInterface &ci,const QCString &langExt)
+DocbookDocVisitor::DocbookDocVisitor(TextStream &t,OutputCodeList &ci,const QCString &langExt)
   : m_t(t), m_ci(ci),m_langExt(langExt)
 {
 DB_VIS_C
@@ -203,14 +202,14 @@ void DocbookDocVisitor::operator()(const DocSymbol &s)
 {
 DB_VIS_C
   if (m_hide) return;
-  const char *res = HtmlEntityMapper::instance()->docbook(s.symbol());
+  const char *res = HtmlEntityMapper::instance().docbook(s.symbol());
   if (res)
   {
     m_t << res;
   }
   else
   {
-    err("DocBook: non supported HTML-entity found: %s\n",HtmlEntityMapper::instance()->html(s.symbol(),TRUE));
+    err("DocBook: non supported HTML-entity found: %s\n",HtmlEntityMapper::instance().html(s.symbol(),TRUE));
   }
 }
 
@@ -218,7 +217,7 @@ void DocbookDocVisitor::operator()(const DocEmoji &s)
 {
 DB_VIS_C
   if (m_hide) return;
-  const char *res = EmojiEntityMapper::instance()->unicode(s.index());
+  const char *res = EmojiEntityMapper::instance().unicode(s.index());
   if (res)
   {
     m_t << res;
@@ -245,7 +244,7 @@ void DocbookDocVisitor::operator()(const DocLineBreak &)
 {
 DB_VIS_C
   if (m_hide) return;
-  m_t << "\n<literallayout>&#160;&#xa;</literallayout>\n";
+  m_t << "<?linebreak?>";
   // gives nicer results but gives problems as it is not allowed in <pare> and also problems with dblatex
   // m_t << "\n" << "<sbr/>\n";
 }
@@ -306,21 +305,6 @@ DB_VIS_C
     case DocStyleChange::Ins:        break;
     case DocStyleChange::Div:  /* HTML only */ break;
     case DocStyleChange::Span: /* HTML only */ break;
-    case DocStyleChange::Details: /* emulation of the <details> tag */
-      if (s.enable())
-      {
-        m_t << "\n";
-        m_t << "<para>";
-      }
-      else
-      {
-        m_t << "</para>";
-        m_t << "\n";
-      }
-      break;
-    case DocStyleChange::Summary: /* emulation of the <summary> tag inside a <details> tag */
-      if (s.enable()) m_t << "<emphasis role=\"bold\">";      else m_t << "</emphasis>";
-      break;
   }
 }
 
@@ -383,17 +367,17 @@ DB_VIS_C
             qPrint(Config_getString(DOCBOOK_OUTPUT)+"/inline_dotgraph_"),
             dotindex++
             );
-        std::string fileName = baseName.str()+".dot";
-        std::ofstream file(fileName,std::ofstream::out | std::ofstream::binary);
+        QCString fileName = baseName+".dot";
+        std::ofstream file = Portable::openOutputStream(fileName);
         if (!file.is_open())
         {
-          err("Could not open file %s for writing\n",fileName.c_str());
+          err("Could not open file %s for writing\n",qPrint(fileName));
         }
         file.write( stext.data(), stext.length() );
         file.close();
         writeDotFile(baseName, s);
         m_t << "</para>\n";
-        if (Config_getBool(DOT_CLEANUP)) Dir().remove(fileName);
+        if (Config_getBool(DOT_CLEANUP)) Dir().remove(fileName.str());
       }
       break;
     case DocVerbatim::Msc:
@@ -408,11 +392,11 @@ DB_VIS_C
             (Config_getString(DOCBOOK_OUTPUT)+"/inline_mscgraph_").data(),
             mscindex++
             );
-        std::string fileName = baseName.str()+".msc";
-        std::ofstream file(fileName,std::ofstream::out | std::ofstream::binary);
+        QCString fileName = baseName+".msc";
+        std::ofstream file = Portable::openOutputStream(fileName);
         if (!file.is_open())
         {
-          err("Could not open file %s for writing\n",fileName.c_str());
+          err("Could not open file %s for writing\n",qPrint(fileName));
         }
         QCString text = "msc {";
         text+=stext;
@@ -421,7 +405,7 @@ DB_VIS_C
         file.close();
         writeMscFile(baseName,s);
         m_t << "</para>\n";
-        if (Config_getBool(DOT_CLEANUP)) Dir().remove(fileName);
+        if (Config_getBool(DOT_CLEANUP)) Dir().remove(fileName.str());
       }
       break;
     case DocVerbatim::PlantUML:
@@ -462,13 +446,12 @@ DB_VIS_C
       {
         m_t << "<literallayout><computeroutput>";
         FileInfo cfi( inc.file().str() );
-        FileDef *fd = createFileDef( cfi.dirPath(), cfi.fileName() );
+        auto fd = createFileDef( cfi.dirPath(), cfi.fileName() );
         getCodeParser(inc.extension()).parseCode(m_ci,inc.context(),
                                                   inc.text(),
                                                   langExt,
                                                   inc.isExample(),
-                                                  inc.exampleFile(), fd);
-        delete fd;
+                                                  inc.exampleFile(), fd.get());
         m_t << "</computeroutput></literallayout>";
       }
       break;
@@ -498,10 +481,11 @@ DB_VIS_C
       m_t << "</literallayout>";
       break;
     case DocInclude::Snippet:
+    case DocInclude::SnippetTrimLeft:
       m_t << "<literallayout><computeroutput>";
       getCodeParser(inc.extension()).parseCode(m_ci,
                                                 inc.context(),
-                                                extractBlock(inc.text(),inc.blockId()),
+                                                extractBlock(inc.text(),inc.blockId(),inc.type()==DocInclude::SnippetTrimLeft),
                                                 langExt,
                                                 inc.isExample(),
                                                 inc.exampleFile()
@@ -511,7 +495,7 @@ DB_VIS_C
     case DocInclude::SnipWithLines:
       {
          FileInfo cfi( inc.file().str() );
-         FileDef *fd = createFileDef( cfi.dirPath(), cfi.fileName() );
+         auto fd = createFileDef( cfi.dirPath(), cfi.fileName() );
          m_t << "<literallayout><computeroutput>";
          getCodeParser(inc.extension()).parseCode(m_ci,
                                            inc.context(),
@@ -519,14 +503,13 @@ DB_VIS_C
                                            langExt,
                                            inc.isExample(),
                                            inc.exampleFile(),
-                                           fd,
+                                           fd.get(),
                                            lineBlock(inc.text(),inc.blockId()),
                                            -1,    // endLine
                                            FALSE, // inlineFragment
                                            0,     // memberDef
                                            TRUE   // show line number
                                           );
-         delete fd;
          m_t << "</computeroutput></literallayout>";
       }
       break;
@@ -558,7 +541,7 @@ DB_VIS_C
     m_hide = popHidden();
     if (!m_hide)
     {
-      FileDef *fd = 0;
+      std::unique_ptr<FileDef> fd;
       if (!op.includeFileName().isEmpty())
       {
         FileInfo cfi( op.includeFileName().str() );
@@ -568,14 +551,13 @@ DB_VIS_C
       getCodeParser(locLangExt).parseCode(m_ci,op.context(),
                                         op.text(),langExt,op.isExample(),
                                         op.exampleFile(),
-                                        fd,     // fileDef
+                                        fd.get(),     // fileDef
                                         op.line(),    // startLine
                                         -1,    // endLine
                                         FALSE, // inline fragment
                                         0,     // memberDef
                                         op.showLineNo()  // show line numbers
                                        );
-      if (fd) delete fd;
     }
     pushHidden(m_hide);
     m_hide=TRUE;
@@ -930,7 +912,10 @@ void DocbookDocVisitor::operator()(const DocHtmlList &s)
 DB_VIS_C
   if (m_hide) return;
   if (s.children().empty()) return;
-  // opening tag will be handled in DocHtmlListItem
+  // opening tag for ordered list will be handled in DocHtmlListItem
+  // due to (re-)numbering possibilities
+  if (s.type()!=DocHtmlList::Ordered)
+    m_t << "<itemizedlist>\n";
   visitChildren(s);
   if (s.type()==DocHtmlList::Ordered)
     m_t << "</orderedlist>\n";
@@ -996,10 +981,6 @@ DB_VIS_C
       m_t << ">\n";
     }
   }
-  else
-  {
-    m_t << "<itemizedlist>\n";
-  }
   m_t << "<listitem>\n";
   visitChildren(s);
   m_t << "</listitem>\n";
@@ -1039,7 +1020,7 @@ DB_VIS_C
   if (m_hide) return;
   m_t << "<informaltable frame=\"all\">\n";
   m_t << "    <tgroup cols=\"" << t.numColumns() << "\" align=\"left\" colsep=\"1\" rowsep=\"1\">\n";
-  for (uint i = 0; i <t.numColumns(); i++)
+  for (uint32_t i = 0; i <t.numColumns(); i++)
   {
     // do something with colwidth based of cell width specification (be aware of possible colspan in the header)?
     m_t << "      <colspec colname='c" << i+1 << "'/>\n";
@@ -1116,17 +1097,17 @@ DB_VIS_C
     }
     else if (opt.name=="class")
     {
-      if (opt.value.left(13)=="markdownTable") // handle markdown generated attributes
+      if (opt.value.startsWith("markdownTable")) // handle markdown generated attributes
       {
-        if (opt.value.right(5)=="Right")
+        if (opt.value.endsWith("Right"))
         {
           m_t << " align='right'";
         }
-        else if (opt.value.right(4)=="Left")
+        else if (opt.value.endsWith("Left"))
         {
           m_t << " align='left'";
         }
-        else if (opt.value.right(6)=="Center")
+        else if (opt.value.endsWith("Center"))
         {
           m_t << " align='center'";
         }
@@ -1182,6 +1163,31 @@ DB_VIS_C
   }
   visitChildren(href);
   m_t << "</link>";
+}
+
+void DocbookDocVisitor::operator()(const DocHtmlSummary &s)
+{
+DB_VIS_C
+  if (m_hide) return;
+  m_t << "<para><emphasis role=\"bold\">";
+  visitChildren(s);
+  m_t << "</emphasis></para>";
+}
+
+void DocbookDocVisitor::operator()(const DocHtmlDetails &d)
+{
+DB_VIS_C
+  if (m_hide) return;
+  m_t << "\n";
+  auto summary = d.summary();
+  if (summary)
+  {
+    std::visit(*this,*summary);
+  }
+  m_t << "<para>";
+  visitChildren(d);
+  m_t << "</para>";
+  m_t << "\n";
 }
 
 void DocbookDocVisitor::operator()(const DocHtmlHeader &h)

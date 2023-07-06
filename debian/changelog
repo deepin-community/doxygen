@@ -1,3 +1,9 @@
+doxygen (1.9.7-0deepin3) UNRELEASED; urgency=medium
+
+  * new upstream release
+
+ -- Xiang Zelong <xiangzelong@deepin.org>  Thu, 06 Jul 2023 13:45:09 +0800
+
 doxygen (1.9.4.1-deepin-1) unstable; urgency=medium
 
   * Use gcc for riscv64

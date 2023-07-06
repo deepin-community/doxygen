@@ -36,7 +36,7 @@ CONFIGUREFLAGS += -Dbuild_parse=ON
 
 configure-stamp:
 	dh_testdir
-	$(MAKE) -C jquery install
+	$(MAKE) -C deps/jquery/ install
 	rm -rf build
 	mkdir -p build
 	cd build && cmake -G "Unix Makefiles" $(CONFIGUREFLAGS) $(CURDIR)

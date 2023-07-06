@@ -5,8 +5,8 @@ Last-Update: 2022-07-16
 
 Index: doxygen/jquery/sass/_sm-dox.scss
 ===================================================================
---- doxygen.orig/jquery/sass/_sm-dox.scss
-+++ doxygen/jquery/sass/_sm-dox.scss
+--- doxygen.orig/deps/jquery/sass/_sm-dox.scss
++++ doxygen/deps/jquery/sass/_sm-dox.scss
 @@ -455,7 +455,7 @@ $sm-dox__toggle-spacing: floor($sm-dox__
              border-color: transparent transparent $sm-dox__desktop-sub-item-color transparent;
          }

@@ -80,10 +80,10 @@ class VhdlDocGen
     {
       switch (prot)
       {
-        case Public:    return ENTITYCLASS;
-        case Protected: return PACKBODYCLASS;
-        case Private:   return ARCHITECTURECLASS;
-        case Package:   return PACKAGECLASS;
+        case Protection::Public:    return ENTITYCLASS;
+        case Protection::Protected: return PACKBODYCLASS;
+        case Protection::Private:   return ARCHITECTURECLASS;
+        case Protection::Package:   return PACKAGECLASS;
       }
       return ENTITYCLASS;
     }
@@ -122,7 +122,7 @@ class VhdlDocGen
     VhdlDocGen();
     virtual ~VhdlDocGen();
     static void init();
-    static QCString convertFileNameToClassName(QCString name);
+    static QCString convertFileNameToClassName(const QCString &name);
     // --- used by vhdlscanner.l -----------
 
     static bool isSubClass(ClassDef* cd,ClassDef *scd, bool followInstances,int level);

@@ -28,7 +28,7 @@
 
 class Entry;
 class FileDef;
-class CodeOutputInterface;
+class OutputCodeList;
 class MemberDef;
 class Definition;
 class ClangTUParser;
@@ -87,7 +87,7 @@ class CodeParserInterface
 
     /** Parses a source file or fragment with the goal to produce
      *  highlighted and cross-referenced output.
-     *  @param[in] codeOutIntf Abstract interface for writing the result.
+     *  @param[in] codeOutList interface for writing the result.
      *  @param[in] scopeName Name of scope to which the code belongs.
      *  @param[in] input Actual code in the form of a string
      *  @param[in] lang The programming language of the code fragment.
@@ -107,7 +107,7 @@ class CodeParserInterface
      *  @param[in] searchCtx context under which search data has to be stored.
      *  @param[in] collectXRefs collect cross-reference relations.
      */
-    virtual void parseCode(CodeOutputInterface &codeOutIntf,
+    virtual void parseCode(OutputCodeList &codeOutList,
                            const QCString &scopeName,
                            const QCString &input,
                            SrcLangExt lang,
@@ -147,7 +147,7 @@ class ParserManager
 
     struct ParserPair
     {
-      ParserPair(OutlineParserFactory opf, CodeParserFactory cpf, const QCString &pn)
+      ParserPair(OutlineParserFactory opf, const CodeParserFactory &cpf, const QCString &pn)
         : outlineParserFactory(opf), codeParserFactory(cpf), parserName(pn)
       {
       }
@@ -162,8 +162,8 @@ class ParserManager
      *  @param outlineParserFactory the fallback outline parser factory to use for unknown extensions
      *  @param codeParserFactory    the fallback code parser factory to use for unknown extensions
      */
-    ParserManager(OutlineParserFactory outlineParserFactory,
-                  CodeParserFactory    codeParserFactory)
+    ParserManager(const OutlineParserFactory &outlineParserFactory,
+                  const CodeParserFactory    &codeParserFactory)
       : m_defaultParsers(outlineParserFactory,codeParserFactory, QCString())
     {
     }
@@ -176,8 +176,8 @@ class ParserManager
      *  @param[in] codeParserFactory    A factory method to create a code parser that is to be used
      *                           for the given name.
      */
-    void registerParser(const QCString &name,OutlineParserFactory outlineParserFactory,
-                                         CodeParserFactory    codeParserFactory)
+    void registerParser(const QCString &name,const OutlineParserFactory &outlineParserFactory,
+                                             const CodeParserFactory    &codeParserFactory)
     {
       m_parsers.emplace(name.str(),ParserPair(outlineParserFactory,codeParserFactory,name));
     }

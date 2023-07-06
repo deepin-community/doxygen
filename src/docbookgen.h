@@ -1,8 +1,6 @@
 /******************************************************************************
 *
-*
-*
-* Copyright (C) 1997-2015 by Dimitri van Heesch.
+* Copyright (C) 1997-2022 by Dimitri van Heesch.
 *
 * Permission to use, copy, modify, and distribute this software and its
 * documentation under the terms of the GNU General Public License is hereby
@@ -15,54 +13,11 @@
 #ifndef DOCBOOKGEN_H
 #define DOCBOOKGEN_H
 
-#include <iostream>
+#include <memory>
+#include <array>
 
 #include "config.h"
 #include "outputgen.h"
-
-class DocbookCodeGenerator : public CodeOutputInterface
-{
-  public:
-    DocbookCodeGenerator(TextStream &t);
-    void setRelativePath(const QCString &path) { m_relPath = path; }
-    void setSourceFileName(const QCString &sourceFileName) { m_sourceFileName = sourceFileName; }
-    QCString sourceFileName() { return m_sourceFileName; }
-
-    void codify(const QCString &text);
-    void writeCodeLink(CodeSymbolType type,
-        const QCString &ref,const QCString &file,
-        const QCString &anchor,const QCString &name,
-        const QCString &tooltip);
-    void writeCodeLinkLine(CodeSymbolType type,
-        const QCString &ref,const QCString &file,
-        const QCString &anchor,const QCString &name,
-        const QCString &tooltip, bool);
-    void writeTooltip(const QCString &, const DocLinkInfo &, const QCString &,
-                      const QCString &, const SourceLinkInfo &, const SourceLinkInfo &
-                     );
-    void startCodeLine(bool);
-    void endCodeLine();
-    void startFontClass(const QCString &colorClass);
-    void endFontClass();
-    void writeCodeAnchor(const QCString &);
-    void writeLineNumber(const QCString &extRef,const QCString &compId,
-        const QCString &anchorId,int l, bool writeLineAnchor);
-    void finish();
-    void startCodeFragment(const QCString &style);
-    void endCodeFragment(const QCString &style);
-
-  private:
-    TextStream &m_t;
-    QCString m_refId;
-    QCString m_external;
-    int m_lineNumber = -1;
-    int m_col = 0;
-    bool m_insideCodeLine = false;
-    bool m_insideSpecialHL = false;
-    QCString m_relPath;
-    QCString m_sourceFileName;
-};
-
 
 #if 0
 // define for cases that have been implemented with an empty body
@@ -87,49 +42,69 @@ class DocbookCodeGenerator : public CodeOutputInterface
 #define DB_GEN_NEW
 #endif
 
+class OutputCodeList;
+
+class DocbookCodeGenerator
+{
+  public:
+    DocbookCodeGenerator(TextStream *t);
+    void setTextStream(TextStream *t) { m_t = t; }
+
+    OutputType type() const { return OutputType::Docbook; }
+
+    void codify(const QCString &text);
+    void writeCodeLink(CodeSymbolType type,
+        const QCString &ref,const QCString &file,
+        const QCString &anchor,const QCString &name,
+        const QCString &tooltip);
+    void writeTooltip(const QCString &, const DocLinkInfo &, const QCString &,
+                      const QCString &, const SourceLinkInfo &, const SourceLinkInfo &
+                     );
+    void startCodeLine(bool);
+    void endCodeLine();
+    void startFontClass(const QCString &colorClass);
+    void endFontClass();
+    void writeCodeAnchor(const QCString &);
+    void writeLineNumber(const QCString &extRef,const QCString &compId,
+        const QCString &anchorId,int l, bool writeLineAnchor);
+    void startCodeFragment(const QCString &style);
+    void endCodeFragment(const QCString &style);
+
+    void setRelativePath(const QCString &path) { m_relPath = path; }
+    void setSourceFileName(const QCString &sourceFileName) { m_sourceFileName = sourceFileName; }
+    QCString sourceFileName() { return m_sourceFileName; }
+    void finish();
+
+  private:
+    void writeCodeLinkLine(CodeSymbolType type,
+        const QCString &ref,const QCString &file,
+        const QCString &anchor,const QCString &name,
+        const QCString &tooltip, bool);
+    TextStream *m_t;
+    QCString    m_refId;
+    QCString    m_external;
+    int         m_lineNumber = -1;
+    int         m_col = 0;
+    bool        m_insideCodeLine = false;
+    bool        m_insideSpecialHL = false;
+    QCString    m_relPath;
+    QCString    m_sourceFileName;
+};
+
 class DocbookGenerator : public OutputGenerator
 {
   public:
     DocbookGenerator();
-    DocbookGenerator(const DocbookGenerator &o);
-    DocbookGenerator &operator=(const DocbookGenerator &o);
-    virtual ~DocbookGenerator();
-    virtual std::unique_ptr<OutputGenerator> clone() const;
+    DocbookGenerator(const DocbookGenerator &);
+    DocbookGenerator &operator=(const DocbookGenerator &);
+    DocbookGenerator(DocbookGenerator &&);
+    DocbookGenerator &operator=(DocbookGenerator &&) = delete;
+   ~DocbookGenerator();
 
     static void init();
     void cleanup();
 
-    OutputType type() const { return Docbook; }
-
-    // --- CodeOutputInterface
-    void codify(const QCString &text)
-    { m_codeGen.codify(text); }
-    void writeCodeLink(CodeSymbolType type,
-                       const QCString &ref, const QCString &file,
-                       const QCString &anchor,const QCString &name,
-                       const QCString &tooltip)
-    { m_codeGen.writeCodeLink(type,ref,file,anchor,name,tooltip); }
-    void writeLineNumber(const QCString &ref,const QCString &file,const QCString &anchor,int lineNumber, bool writeLineAnchor)
-    { m_codeGen.writeLineNumber(ref,file,anchor,lineNumber,writeLineAnchor); }
-    void writeTooltip(const QCString &id, const DocLinkInfo &docInfo, const QCString &decl,
-                      const QCString &desc, const SourceLinkInfo &defInfo, const SourceLinkInfo &declInfo
-                     )
-    { m_codeGen.writeTooltip(id,docInfo,decl,desc,defInfo,declInfo); }
-    void startCodeLine(bool hasLineNumbers)
-    { m_codeGen.startCodeLine(hasLineNumbers); }
-    void endCodeLine()
-    { m_codeGen.endCodeLine(); }
-    void startFontClass(const QCString &s)
-    { m_codeGen.startFontClass(s); }
-    void endFontClass()
-    { m_codeGen.endFontClass(); }
-    void writeCodeAnchor(const QCString &anchor)
-    { m_codeGen.writeCodeAnchor(anchor); }
-    void startCodeFragment(const QCString &style)
-    { m_codeGen.startCodeFragment(style); }
-    void endCodeFragment(const QCString &style)
-    { m_codeGen.endCodeFragment(style); }
-    // ---------------------------
+    OutputType type() const { return OutputType::Docbook; }
 
     void writeDoc(const IDocNodeAST *node,const Definition *ctx,const MemberDef *md,int id);
 
@@ -137,12 +112,12 @@ class DocbookGenerator : public OutputGenerator
     // structural output interface
     ///////////////////////////////////////////////////////////////
     void startFile(const QCString &name,const QCString &manName,
-                           const QCString &title,int id);
+                           const QCString &title,int id,int hierarchyLevel);
     void writeSearchInfo(){DB_GEN_EMPTY};
     void writeFooter(const QCString &){DB_GEN_NEW};
     void endFile();
-    void startIndexSection(IndexSections);
-    void endIndexSection(IndexSections);
+    void startIndexSection(IndexSection);
+    void endIndexSection(IndexSection);
     void writePageLink(const QCString &,bool);
     void startProjectNumber(){DB_GEN_NEW};
     void endProjectNumber(){DB_GEN_NEW};
@@ -170,8 +145,6 @@ class DocbookGenerator : public OutputGenerator
     void startParagraph(const QCString &);
     void endParagraph();
     void writeObjectLink(const QCString &,const QCString &,const QCString &,const QCString &);
-    void startHtmlLink(const QCString &){DB_GEN_NEW};
-    void endHtmlLink(){DB_GEN_NEW};
     void startBold();
     void endBold();
     void startTypewriter();
@@ -179,22 +152,14 @@ class DocbookGenerator : public OutputGenerator
     void startEmphasis(){DB_GEN_NEW};
     void endEmphasis(){DB_GEN_NEW};
     void writeRuler();
-    void startDescription(){DB_GEN_NEW};
-    void endDescription(){DB_GEN_NEW};
-    void startDescItem(){DB_GEN_NEW};
     void startDescForItem(){DB_GEN_EMPTY};
     void endDescForItem(){DB_GEN_EMPTY};
-    void endDescItem(){DB_GEN_NEW};
     void startCenter(){DB_GEN_NEW};
     void endCenter(){DB_GEN_NEW};
     void startSmall(){DB_GEN_NEW};
     void endSmall(){DB_GEN_NEW};
     void startExamples();
     void endExamples();
-    void startParamList(BaseOutputDocInterface::ParamListTypes,const QCString &){DB_GEN_NEW};
-    void endParamList(){DB_GEN_NEW};
-    void startTitle(){DB_GEN_NEW};
-    void endTitle(){DB_GEN_NEW};
     void writeAnchor(const QCString &,const QCString &){DB_GEN_EMPTY};
     void startSection(const QCString &,const QCString &,SectionType);
     void endSection(const QCString &,SectionType);
@@ -213,11 +178,6 @@ class DocbookGenerator : public OutputGenerator
     void endTextLink(){DB_GEN_NEW};
     void startPageRef(){DB_GEN_NEW};
     void endPageRef(const QCString &,const QCString &){DB_GEN_NEW};
-    void startSubsection(){DB_GEN_NEW};
-    void endSubsection(){DB_GEN_NEW};
-    void startSubsubsection();
-    void endSubsubsection();
-
 
     void startGroupHeader(int);
     void endGroupHeader(int);
@@ -237,12 +197,12 @@ class DocbookGenerator : public OutputGenerator
     void endInlineHeader(){DB_GEN_NEW};
     void startAnonTypeScope(int){DB_GEN_EMPTY};
     void endAnonTypeScope(int){DB_GEN_EMPTY};
-    void startMemberItem(const QCString &,int,const QCString &);
-    void endMemberItem();
+    void startMemberItem(const QCString &,MemberItemType,const QCString &);
+    void endMemberItem(MemberItemType);
     void startMemberTemplateParams();
     void endMemberTemplateParams(const QCString &,const QCString &);
-    void startCompoundTemplateParams() { startSubsubsection(); }
-    void endCompoundTemplateParams() { endSubsubsection(); }
+    void startCompoundTemplateParams();
+    void endCompoundTemplateParams();
     void startMemberGroupHeader(bool);
     void endMemberGroupHeader();
     void startMemberGroupDocs(){DB_GEN_EMPTY};
@@ -250,7 +210,7 @@ class DocbookGenerator : public OutputGenerator
     void startMemberGroup();
     void endMemberGroup(bool);
     void insertMemberAlign(bool){DB_GEN_EMPTY};
-    void insertMemberAlignLeft(int,bool){DB_GEN_EMPTY};
+    void insertMemberAlignLeft(MemberItemType,bool){DB_GEN_EMPTY};
     void startMemberDoc(const QCString &,const QCString &,
                         const QCString &,const QCString &,int,int,bool);
     void endMemberDoc(bool);
@@ -261,14 +221,13 @@ class DocbookGenerator : public OutputGenerator
     void writeLatexSpacing(){DB_GEN_EMPTY}
     void writeStartAnnoItem(const QCString &,const QCString &,
                             const QCString &,const QCString &){DB_GEN_NEW};
-    void writeEndAnnoItem(const QCString &){DB_GEN_NEW};
     void startMemberDescription(const QCString &,const QCString &,bool){DB_GEN_EMPTY};
     void endMemberDescription(){DB_GEN_EMPTY};
     void startMemberDeclaration(){DB_GEN_EMPTY};
     void endMemberDeclaration(const QCString &,const QCString &){DB_GEN_EMPTY};
     void writeInheritedSectionTitle(const QCString &,const QCString &,
                                     const QCString &,const QCString &,
-                                    const QCString &,const QCString &){DB_GEN_NEW};
+                                    const QCString &,const QCString &);
     void startIndent(){DB_GEN_EMPTY};
     void endIndent(){DB_GEN_EMPTY};
     void writeSynopsis(){DB_GEN_EMPTY};
@@ -333,26 +292,34 @@ class DocbookGenerator : public OutputGenerator
     void writeLabel(const QCString &,bool);
     void endLabels();
 
+    void writeLocalToc(const SectionRefs &sr,const LocalToc &lt);
+
     void setCurrentDoc(const Definition *,const QCString &,bool) {DB_GEN_EMPTY}
     void addWord(const QCString &,bool) {DB_GEN_EMPTY}
 
+    void addCodeGen(OutputCodeList &list);
 private:
     void openSection(const QCString &attr=QCString());
     void closeSection();
     void closeAllSections();
 
     QCString relPath;
-    DocbookCodeGenerator m_codeGen;
+    std::unique_ptr<OutputCodeList>  m_codeList;
+    DocbookCodeGenerator *m_codeGen = nullptr;
     bool m_denseText = false;
     bool m_inGroup = false;
     int  m_levelListItem = 0;
-    bool m_inListItem[20] = { false, };
-    bool m_inSimpleSect[20] = { false, };
+    std::array<bool,20> m_inListItem = { false, };
+    std::array<bool,20> m_inSimpleSect = { false, };
     bool m_descTable = false;
     bool m_simpleTable = false;
     int m_inLevel = -1;
     bool m_firstMember = false;
     int m_openSectionCount = 0;
+    QCString m_pageLinks;
 };
+
+QCString convertToDocBook(const QCString &s, const bool retainNewline = false);
+
 
 #endif

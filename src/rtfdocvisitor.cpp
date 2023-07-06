@@ -1,9 +1,6 @@
 /******************************************************************************
  *
- *
- *
- *
- * Copyright (C) 1997-2015 by Dimitri van Heesch.
+ * Copyright (C) 1997-2022 by Dimitri van Heesch.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation under the terms of the GNU General Public License is hereby
@@ -27,6 +24,7 @@
 #include "msc.h"
 #include "util.h"
 #include "rtfstyle.h"
+#include "rtfgen.h"
 #include "message.h"
 #include "parserintf.h"
 #include "msc.h"
@@ -37,6 +35,7 @@
 #include "emoji.h"
 #include "plantuml.h"
 #include "fileinfo.h"
+#include "portable.h"
 
 //#define DBG_RTF(x) m_t << x
 #define DBG_RTF(x) do {} while(0)
@@ -55,9 +54,9 @@ static QCString align(const DocHtmlCell &cell)
   return "";
 }
 
-RTFDocVisitor::RTFDocVisitor(TextStream &t,CodeOutputInterface &ci,
-                             const QCString &langExt)
-  : m_t(t), m_ci(ci), m_langExt(langExt)
+RTFDocVisitor::RTFDocVisitor(TextStream &t,OutputCodeList &ci,
+                             const QCString &langExt, int hierarchyLevel)
+  : m_t(t), m_ci(ci), m_langExt(langExt), m_hierarchyLevel(hierarchyLevel)
 {
 }
 
@@ -128,14 +127,14 @@ void RTFDocVisitor::operator()(const DocSymbol &s)
 {
   if (m_hide) return;
   DBG_RTF("{\\comment RTFDocVisitor::visit(DocSymbol)}\n");
-  const char *res = HtmlEntityMapper::instance()->rtf(s.symbol());
+  const char *res = HtmlEntityMapper::instance().rtf(s.symbol());
   if (res)
   {
     m_t << res;
   }
   else
   {
-    err("RTF: non supported HTML-entity found: %s\n",HtmlEntityMapper::instance()->html(s.symbol(),TRUE));
+    err("RTF: non supported HTML-entity found: %s\n",HtmlEntityMapper::instance().html(s.symbol(),TRUE));
   }
   m_lastIsPara=FALSE;
 }
@@ -144,7 +143,7 @@ void RTFDocVisitor::operator()(const DocEmoji &s)
 {
   if (m_hide) return;
   DBG_RTF("{\\comment RTFDocVisitor::visit(DocEmoji)}\n");
-  const char *res = EmojiEntityMapper::instance()->unicode(s.index());
+  const char *res = EmojiEntityMapper::instance().unicode(s.index());
   if (res)
   {
     const char *p = res;
@@ -286,22 +285,6 @@ void RTFDocVisitor::operator()(const DocStyleChange &s)
       break;
     case DocStyleChange::Div:  /* HTML only */ break;
     case DocStyleChange::Span: /* HTML only */ break;
-    case DocStyleChange::Details: /* emulation of the <details> tag */
-      if (s.enable())
-      {
-        m_t << "{\n";
-        m_t << "\\par\n";
-      }
-      else
-      {
-        m_t << "\\par";
-        m_t << "}\n";
-      }
-      m_lastIsPara=TRUE;
-      break;
-    case DocStyleChange::Summary: /* emulation of the <summary> tag inside a <details> tag */
-      if (s.enable()) m_t << "{\\b ";      else m_t << "} ";
-      break;
   }
 }
 
@@ -364,7 +347,7 @@ void RTFDocVisitor::operator()(const DocVerbatim &s)
             dotindex++,
             ".dot"
            );
-        std::ofstream file(fileName.str(),std::ofstream::out | std::ofstream::binary);
+        std::ofstream file = Portable::openOutputStream(fileName);
         if (!file.is_open())
         {
           err("Could not open file %s for writing\n",qPrint(fileName));
@@ -393,7 +376,7 @@ void RTFDocVisitor::operator()(const DocVerbatim &s)
             mscindex++,
             ".msc"
            );
-        std::ofstream file(baseName.str(),std::ofstream::out | std::ofstream::binary);
+        std::ofstream file = Portable::openOutputStream(baseName);
         if (!file.is_open())
         {
           err("Could not open file %s for writing\n",qPrint(baseName));
@@ -462,20 +445,19 @@ void RTFDocVisitor::operator()(const DocInclude &inc)
          m_t << "\\par\n";
          m_t << rtf_Style_Reset << getStyle("CodeExample");
          FileInfo cfi( inc.file().str() );
-         FileDef *fd = createFileDef( cfi.dirPath(), cfi.fileName() );
+         auto fd = createFileDef( cfi.dirPath(), cfi.fileName() );
          getCodeParser(inc.extension()).parseCode(m_ci,inc.context(),
                                            inc.text(),
                                            langExt,
                                            inc.isExample(),
                                            inc.exampleFile(),
-                                           fd,   // fileDef,
+                                           fd.get(),   // fileDef,
                                            -1,    // start line
                                            -1,    // end line
                                            FALSE, // inline fragment
                                            0,     // memberDef
                                            TRUE   // show line numbers
 					   );
-         delete fd;
          m_t << "\\par";
          m_t << "}\n";
       }
@@ -517,12 +499,13 @@ void RTFDocVisitor::operator()(const DocInclude &inc)
       m_t << "}\n";
       break;
     case DocInclude::Snippet:
+    case DocInclude::SnippetTrimLeft:
       m_t << "{\n";
       if (!m_lastIsPara) m_t << "\\par\n";
       m_t << rtf_Style_Reset << getStyle("CodeExample");
       getCodeParser(inc.extension()).parseCode(m_ci,
                                         inc.context(),
-                                        extractBlock(inc.text(),inc.blockId()),
+                                        extractBlock(inc.text(),inc.blockId(),inc.type()==DocInclude::SnippetTrimLeft),
                                         langExt,
                                         inc.isExample(),
                                         inc.exampleFile()
@@ -532,7 +515,7 @@ void RTFDocVisitor::operator()(const DocInclude &inc)
     case DocInclude::SnipWithLines:
       {
          FileInfo cfi( inc.file().str() );
-         FileDef *fd = createFileDef( cfi.dirPath(), cfi.fileName() );
+         auto fd = createFileDef( cfi.dirPath(), cfi.fileName() );
          m_t << "{\n";
          if (!m_lastIsPara) m_t << "\\par\n";
          m_t << rtf_Style_Reset << getStyle("CodeExample");
@@ -542,14 +525,13 @@ void RTFDocVisitor::operator()(const DocInclude &inc)
                                            langExt,
                                            inc.isExample(),
                                            inc.exampleFile(),
-                                           fd,
+                                           fd.get(),
                                            lineBlock(inc.text(),inc.blockId()),
                                            -1,    // endLine
                                            FALSE, // inlineFragment
                                            0,     // memberDef
                                            TRUE   // show line number
                                           );
-         delete fd;
          m_t << "}";
       }
       break;
@@ -586,7 +568,7 @@ void RTFDocVisitor::operator()(const DocIncOperator &op)
     m_hide = popHidden();
     if (!m_hide)
     {
-      FileDef *fd = 0;
+      std::unique_ptr<FileDef> fd = 0;
       if (!op.includeFileName().isEmpty())
       {
         FileInfo cfi( op.includeFileName().str() );
@@ -595,14 +577,13 @@ void RTFDocVisitor::operator()(const DocIncOperator &op)
 
       getCodeParser(locLangExt).parseCode(m_ci,op.context(),op.text(),langExt,
                                         op.isExample(),op.exampleFile(),
-                                        fd,     // fileDef
+                                        fd.get(),     // fileDef
                                         op.line(),    // startLine
                                         -1,    // endLine
                                         FALSE, // inline fragment
                                         0,     // memberDef
                                         op.showLineNo()  // show line numbers
                                        );
-      if (fd) delete fd;
     }
     pushHidden(m_hide);
     m_hide=TRUE;
@@ -875,7 +856,9 @@ void RTFDocVisitor::operator()(const DocSection &s)
   m_t << "{{" // start section
       << rtf_Style_Reset;
   QCString heading;
-  int level = std::min(s.level()+1,4);
+  int level = std::min(s.level()+2+m_hierarchyLevel,4);
+  if (level <= 0)
+    level = 1;
   heading.sprintf("Heading%d",level);
   // set style
   m_t << rtf_Style[heading.str()].reference() << "\n";
@@ -1144,6 +1127,37 @@ void RTFDocVisitor::operator()(const DocHRef &href)
   m_lastIsPara=FALSE;
 }
 
+void RTFDocVisitor::operator()(const DocHtmlSummary &s)
+{
+  if (m_hide) return;
+  m_t << "{\\b ";
+  visitChildren(s);
+  m_t << "}\\par ";
+}
+
+void RTFDocVisitor::operator()(const DocHtmlDetails &d)
+{
+  if (m_hide) return;
+  DBG_RTF("{\\comment RTFDocVisitor::operator()(const DocHtmlDetails &)}\n");
+  if (!m_lastIsPara) m_t << "\\par\n";
+  auto summary = d.summary();
+  if (summary)
+  {
+    std::visit(*this,*summary);
+    m_t << "{"; // start desc
+    incIndentLevel();
+    m_t << rtf_Style_Reset << getStyle("DescContinue");
+  }
+  visitChildren(d);
+  if (!m_lastIsPara) m_t << "\\par\n";
+  if (summary)
+  {
+    decIndentLevel();
+    m_t << "}"; // end desc
+  }
+  m_lastIsPara=TRUE;
+}
+
 void RTFDocVisitor::operator()(const DocHtmlHeader &header)
 {
   if (m_hide) return;
@@ -1151,7 +1165,9 @@ void RTFDocVisitor::operator()(const DocHtmlHeader &header)
   m_t << "{" // start section
       << rtf_Style_Reset;
   QCString heading;
-  int level = std::min(header.level(),5);
+  int level = std::min(header.level()+m_hierarchyLevel,5);
+  if (level <= 0)
+    level = 1;
   heading.sprintf("Heading%d",level);
   // set style
   m_t << rtf_Style[heading.str()].reference();
