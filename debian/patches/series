@@ -3,3 +3,5 @@
 0003-faketime-pdflatex.patch
 manpages.diff
 sass_fix.diff
+markdown-fix-10056.patch
+markdown-fix-10089.patch
