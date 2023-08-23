@@ -1,5 +1,15 @@
-doxygen (1.9.7-0deepin3) UNRELEASED; urgency=medium
+doxygen (1.9.7-0deepin4) unstable; urgency=medium
 
+  * Apply patch from upstream to fix markdown ref.
+    See: https://github.com/doxygen/doxygen/issues/10056,
+    https://github.com/doxygen/doxygen/issues/10089 and
+    https://github.com/deepin-community/netcdf/pull/1#issuecomment-1689493699
+
+ -- Tianyu Chen <sweetyfish@deepin.org>  Wed, 23 Aug 2023 16:21:12 +0800
+
+doxygen (1.9.7-0deepin3) unstable; urgency=medium
+
+  [ Xiang Zelong ]
   * new upstream release
 
  -- Xiang Zelong <xiangzelong@deepin.org>  Thu, 06 Jul 2023 13:45:09 +0800
