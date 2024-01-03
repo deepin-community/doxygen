@@ -1,0 +1,31 @@
+Last-Update: 2023-08-27
+
+Index: doxygen/src/config.xml
+===================================================================
+--- doxygen.orig/src/config.xml
++++ doxygen/src/config.xml
+@@ -3666,7 +3666,7 @@ where `loc1` and `loc2` can be relative
+ ]]>
+       </docs>
+     </option>
+-    <option type='bool' id='HAVE_DOT' defval='0'>
++    <option type='bool' id='HAVE_DOT' defval='1'>
+       <docs>
+ <![CDATA[
+  If you set the \c HAVE_DOT tag to \c YES then doxygen will assume the \c dot tool is
+@@ -3940,7 +3940,15 @@ UML notation for the relationships.
+       </docs>
+       <value name='png'/>
+       <value name='jpg'/>
++      <value name='jpg:cairo'/>
++      <value name='jpg:cairo:gd'/>
++      <value name='jpg:gd'/>
++      <value name='jpg:gd:gd'/>
+       <value name='gif'/>
++      <value name='gif:cairo'/>
++      <value name='gif:cairo:gd'/>
++      <value name='gif:gd'/>
++      <value name='gif:gd:gd'/>
+       <value name='svg'/>
+       <value name='png:gd'/>
+       <value name='png:gd:gd'/>

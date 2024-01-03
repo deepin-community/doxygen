@@ -1,0 +1,18 @@
+Description: Fix linking doxyparse to spdlog
+Forwarded: https://github.com/doxygen/doxygen/issues/10265
+Author: Paolo Greppi <paolo.greppi@libpf.com>
+Last-Update: 2023-12-07
+
+Index: doxygen/addon/doxyparse/CMakeLists.txt
+===================================================================
+--- doxygen.orig/addon/doxyparse/CMakeLists.txt
++++ doxygen/addon/doxyparse/CMakeLists.txt
+@@ -38,7 +38,7 @@ mscgen
+ doxygen_version
+ doxycfg
+ vhdlparser
+-spdlog
++spdlog::spdlog
+ ${ICONV_LIBRARIES}
+ ${CMAKE_THREAD_LIBS_INIT}
+ ${SQLITE3_LIBRARIES}

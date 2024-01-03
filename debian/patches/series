@@ -1,7 +1,10 @@
-0001-avoid-compass.patch
-0002-add-dot-config-support.patch
-0003-faketime-pdflatex.patch
 manpages.diff
+dot-config.diff
+avoid-compass.diff
+fix-pdflatex-invocation.diff
+faketime_pdflatex.diff
+libatomic.diff
+reproducible_manpages.diff
 sass_fix.diff
-markdown-fix-10056.patch
-markdown-fix-10089.patch
+exclude_sqlite3.diff
+fix_spdlog_dependency.diff

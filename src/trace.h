@@ -24,12 +24,23 @@
 #endif
 #endif
 
+// Since some modules produce a huge amount of tracing we disable those traces by default.
+// Set of or more of the following to 1 to enable the relevant tracing
+#define ENABLE_SYMBOLRESOLVER_TRACING 0
+#define ENABLE_MARKDOWN_TRACING       0
+#define ENABLE_DOCPARSER_TRACING      0
+
+
 #if ENABLE_TRACING
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE // debug build
 #else
 #define SPELOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO  // release build (hide trace/debug levels)
 #endif
+
+#pragma push_macro("warn")
+#undef warn
 #include "spdlog/spdlog.h"
+#pragma pop_macro("warn")
 
 #include "types.h"
 #include "qcstring.h"

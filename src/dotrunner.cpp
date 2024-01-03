@@ -356,65 +356,9 @@ bool DotRunner::run()
   }
   return TRUE;
 error:
-  err_full(srcFile,srcLine,"Problems running dot: exit code=%d, command='%s', arguments='%s'\n",
+  err_full(srcFile,srcLine,"Problems running dot: exit code=%d, command='%s', arguments='%s'",
     exitCode,qPrint(m_dotExe),qPrint(dotArgs));
   return FALSE;
 }
 
 
-//--------------------------------------------------------------------
-
-void DotRunnerQueue::enqueue(DotRunner *runner)
-{
-  std::lock_guard<std::mutex> locker(m_mutex);
-  m_queue.push(runner);
-  m_bufferNotEmpty.notify_all();
-}
-
-DotRunner *DotRunnerQueue::dequeue()
-{
-  std::unique_lock<std::mutex> locker(m_mutex);
-
-  // wait until something is added to the queue
-  m_bufferNotEmpty.wait(locker, [this]() { return !m_queue.empty(); });
-
-  DotRunner *result = m_queue.front();
-  m_queue.pop();
-  return result;
-}
-
-size_t DotRunnerQueue::size() const
-{
-  std::lock_guard<std::mutex> locker(m_mutex);
-  return m_queue.size();
-}
-
-//--------------------------------------------------------------------
-
-DotWorkerThread::DotWorkerThread(DotRunnerQueue *queue)
-  : m_queue(queue)
-{
-}
-
-DotWorkerThread::~DotWorkerThread()
-{
-  if (isRunning())
-  {
-    wait();
-  }
-}
-
-void DotWorkerThread::run()
-{
-  DotRunner *runner;
-  while ((runner=m_queue->dequeue()))
-  {
-    runner->run();
-  }
-}
-
-void DotWorkerThread::start()
-{
-  assert(!m_thread);
-  m_thread = std::make_unique<std::thread>(&DotWorkerThread::run, this);
-}

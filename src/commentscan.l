@@ -124,10 +124,20 @@ static bool handleCallgraph(yyscan_t yyscanner,const QCString &, const StringVec
 static bool handleHideCallgraph(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleCallergraph(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleHideCallergraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleIncludegraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleIncludedBygraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleHideIncludegraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleHideIncludedBygraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleDirectoryGraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleHideDirectoryGraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleCollaborationgraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleHideCollaborationgraph(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleReferencedByRelation(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleHideReferencedByRelation(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleReferencesRelation(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleHideReferencesRelation(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleGroupgraph(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleHideGroupgraph(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleInternal(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleStatic(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handlePure(yyscan_t yyscanner,const QCString &, const StringVector &);
@@ -150,6 +160,7 @@ static bool handleParam(yyscan_t yyscanner,const QCString &, const StringVector 
 static bool handleRetval(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleFileInfo(yyscan_t yyscanner,const QCString &, const StringVector &);
 static bool handleLineInfo(yyscan_t yyscanner,const QCString &, const StringVector &);
+static bool handleModule(yyscan_t yyscanner,const QCString &, const StringVector &);
 
 #if USE_STATE2STRING
 static const char *stateToString(int state);
@@ -193,6 +204,7 @@ static const std::map< std::string, DocCmdMap > docCmdMap =
   { "class",           { &handleClass,            CommandSpacing::Invisible }},
   { "code",            { &handleFormatBlock,      CommandSpacing::Block     }},
   { "icode",           { &handleFormatBlock,      CommandSpacing::Block     }},
+  { "collaborationgraph", { &handleCollaborationgraph, CommandSpacing::Invisible }},
   { "concept",         { &handleConcept,          CommandSpacing::Invisible }},
   { "copybrief",       { &handleCopyBrief,        CommandSpacing::Invisible }},
   { "copydetails",     { &handleCopyDetails,      CommandSpacing::Block     }},
@@ -205,6 +217,7 @@ static const std::map< std::string, DocCmdMap > docCmdMap =
   { "deprecated",      { &handleDeprecated,       CommandSpacing::XRef      }},
   { "details",         { &handleDetails,          CommandSpacing::Block     }},
   { "dir",             { &handleDir,              CommandSpacing::Invisible }},
+  { "directorygraph",  { &handleDirectoryGraph,   CommandSpacing::Invisible }},
   { "docbookinclude",  { 0,                       CommandSpacing::Inline    }},
   { "docbookonly",     { &handleFormatBlock,      CommandSpacing::Invisible }},
   { "dot",             { &handleFormatBlock,      CommandSpacing::Block     }},
@@ -219,9 +232,15 @@ static const std::map< std::string, DocCmdMap > docCmdMap =
   { "extends",         { &handleExtends,          CommandSpacing::Invisible }},
   { "file",            { &handleFile,             CommandSpacing::Invisible }},
   { "fn",              { &handleFn,               CommandSpacing::Invisible }},
+  { "groupgraph",      { &handleGroupgraph,       CommandSpacing::Invisible }},
   { "headerfile",      { &handleHeaderFile,       CommandSpacing::Invisible }},
   { "hidecallergraph", { &handleHideCallergraph,  CommandSpacing::Invisible }},
   { "hidecallgraph",   { &handleHideCallgraph,    CommandSpacing::Invisible }},
+  { "hidecollaborationgraph", { &handleHideCollaborationgraph, CommandSpacing::Invisible }},
+  { "hidedirectorygraph",  { &handleHideDirectoryGraph,  CommandSpacing::Invisible }},
+  { "hidegroupgraph",  { &handleHideGroupgraph,  CommandSpacing::Invisible }},
+  { "hideincludedbygraph", { &handleHideIncludedBygraph, CommandSpacing::Invisible }},
+  { "hideincludegraph",    { &handleHideIncludegraph,    CommandSpacing::Invisible }},
   { "hideinitializer", { &handleHideInitializer,  CommandSpacing::Invisible }},
   { "hiderefby",       { &handleHideReferencedByRelation, CommandSpacing::Invisible }},
   { "hiderefs",        { &handleHideReferencesRelation,   CommandSpacing::Invisible }},
@@ -233,6 +252,8 @@ static const std::map< std::string, DocCmdMap > docCmdMap =
   { "image",           { &handleImage,            CommandSpacing::Block     }},
   { "implements",      { &handleExtends,          CommandSpacing::Invisible }},
   { "include",         { 0,                       CommandSpacing::Block     }},
+  { "includedbygraph", { &handleIncludedBygraph,  CommandSpacing::Invisible }},
+  { "includegraph",    { &handleIncludegraph,     CommandSpacing::Invisible }},
   { "includelineno",   { 0,                       CommandSpacing::Block     }},
   { "ingroup",         { &handleIngroup,          CommandSpacing::Invisible }},
   { "inherit",         { &handleInherit,          CommandSpacing::Invisible }},
@@ -247,6 +268,7 @@ static const std::map< std::string, DocCmdMap > docCmdMap =
   { "maninclude",      { 0,                       CommandSpacing::Inline    }},
   { "manonly",         { &handleFormatBlock,      CommandSpacing::Invisible }},
   { "memberof",        { &handleMemberOf,         CommandSpacing::Invisible }},
+  { "module",          { &handleModule,           CommandSpacing::Invisible }},
   { "msc",             { &handleFormatBlock,      CommandSpacing::Block     }},
   { "name",            { &handleName,             CommandSpacing::Invisible }},
   { "namespace",       { &handleNamespace,        CommandSpacing::Invisible }},
@@ -471,7 +493,7 @@ static void addAnchor(yyscan_t yyscanner,const QCString &anchor, const QCString 
 static inline void addOutput(yyscan_t yyscanner,const char *s);
 static inline void addOutput(yyscan_t yyscanner,const QCString &s);
 static inline void addOutput(yyscan_t yyscanner,char c);
-static void endBrief(yyscan_t yyscanner,bool addToOutput=TRUE);
+static void endBrief(yyscan_t yyscanner);
 static void handleGuard(yyscan_t yyscanner,const QCString &expr);
 static int yyread(yyscan_t yyscanner,char *buf,int max_size);
 static void addCite(yyscan_t yyscanner);
@@ -536,6 +558,7 @@ SCOPENAME "$"?(({ID}?{BN}*("::"|"."){BN}*)*)((~{BN}*)?{ID})
 TMPLSPEC  "<"{BN}*[^>]+{BN}*">"
 MAILADDR  ("mailto:")?[a-z_A-Z0-9\x80-\xff.+-]+"@"[a-z_A-Z0-9\x80-\xff-]+("."[a-z_A-Z0-9\x80-\xff\-]+)+[a-z_A-Z0-9\x80-\xff\-]+
 RCSTAG    "$"{ID}":"[^\n$]+"$"
+MODULE_ID ({ID}".")*{ID}
 
   // C start comment 
 CCS   "/\*"
@@ -569,6 +592,7 @@ STopt  [^\n@\\]*
 %x      NameSpaceDocArg1
 %x      PackageDocArg1
 %x      ConceptDocArg1
+%x      ModuleDocArg1
 %x      GroupDocArg1
 %x      GroupDocArg2
 %x      SectionLabel
@@ -1026,7 +1050,7 @@ STopt  [^\n@\\]*
                                           else // yyextra->inContext==OutputBrief
                                           { // only go to the detailed description if we have
                                             // found some brief description and not just whitespace
-                                            endBrief(yyscanner,TRUE);
+                                            endBrief(yyscanner);
                                           }
                                           lineCount(yyscanner);
                                         }
@@ -1205,6 +1229,25 @@ STopt  [^\n@\\]*
 <ConceptDocArg1>.                       { // ignore other stuff
                                         }
 
+  /* ------------ handle argument of module command --------------- */
+<ModuleDocArg1>{MODULE_ID}             { // handle argument
+                                         yyextra->current->name = yytext;
+                                         BEGIN( Comment );
+                                       }
+<ModuleDocArg1>{LC}                    { // line continuation
+                                          yyextra->lineNr++;
+                                          addOutput(yyscanner,'\n');
+                                        }
+<ModuleDocArg1>{DOCNL}                 { // missing argument
+                                          warn(yyextra->fileName,yyextra->lineNr,
+                                               "missing argument after "
+                                               "\\module."
+                                              );
+                                          unput_string(yytext,yyleng);
+                                          BEGIN( Comment );
+                                        }
+<ModuleDocArg1>.                        { // ignore other stuff
+                                        }
 
   /* ------ handle argument of class/struct/union command --------------- */
 
@@ -1723,7 +1766,7 @@ STopt  [^\n@\\]*
                                               QCString endTag = "end"+yyextra->blockName;
                                               if (yyextra->blockName=="startuml") endTag="enduml";
                                               warn(yyextra->fileName,yyextra->lineNr,
-                                                 "found */ without matching /* while inside a \\%s block! Perhaps a missing \\%s?\n",qPrint(yyextra->blockName),qPrint(endTag));
+                                                 "found */ without matching /* while inside a \\%s block! Perhaps a missing \\%s?",qPrint(yyextra->blockName),qPrint(endTag));
                                             }
                                           }
                                         }
@@ -2345,6 +2388,16 @@ static bool handleConcept(yyscan_t yyscanner,const QCString &cmd, const StringVe
   BEGIN( ConceptDocArg1 );
   return stop;
 }
+
+static bool handleModule(yyscan_t yyscanner,const QCString &cmd, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  bool stop=makeStructuralIndicator(yyscanner,Entry::MODULEDOC_SEC);
+  yyextra->currentCmd = cmd;
+  BEGIN( ModuleDocArg1 );
+  return stop;
+}
+
 
 static bool handleHeaderFile(yyscan_t yyscanner,const QCString &, const StringVector &)
 {
@@ -3036,6 +3089,76 @@ static bool handleHideCallergraph(yyscan_t yyscanner,const QCString &, const Str
   return FALSE;
 }
 
+static bool handleIncludegraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->includeGraph = TRUE; // ON
+  return FALSE;
+}
+
+static bool handleIncludedBygraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->includedByGraph = TRUE; // ON
+  return FALSE;
+}
+
+static bool handleHideIncludegraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->includeGraph = FALSE; // OFF
+  return FALSE;
+}
+
+static bool handleHideIncludedBygraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->includedByGraph = FALSE; // OFF
+  return FALSE;
+}
+
+static bool handleDirectoryGraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->directoryGraph = TRUE; // ON
+  return FALSE;
+}
+
+static bool handleHideDirectoryGraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->directoryGraph = FALSE; // OFF
+  return FALSE;
+}
+
+static bool handleCollaborationgraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->collaborationGraph = TRUE; // ON
+  return FALSE;
+}
+
+static bool handleHideCollaborationgraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->collaborationGraph = FALSE; // OFF
+  return FALSE;
+}
+
+static bool handleGroupgraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->groupGraph = TRUE; // ON
+  return FALSE;
+}
+
+static bool handleHideGroupgraph(yyscan_t yyscanner,const QCString &, const StringVector &)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->groupGraph = FALSE; // OFF
+  return FALSE;
+}
+
 static bool handleQualifier(yyscan_t yyscanner,const QCString &cmd, const StringVector &)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
@@ -3229,7 +3352,7 @@ static bool handleExtends(yyscan_t yyscanner,const QCString &cmd, const StringVe
 static bool handleCopyBrief(yyscan_t yyscanner,const QCString &, const StringVector &)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  if (yyextra->current->brief.isEmpty() && yyextra->current->doc.isEmpty())
+  if (yyextra->current->brief.stripWhiteSpace().isEmpty() && yyextra->current->doc.stripWhiteSpace().isEmpty())
   { // if we don't have a brief or detailed description yet,
     // then the @copybrief should end up in the brief description.
     // otherwise it will be copied inline (see bug691315 & bug700788)
@@ -3260,7 +3383,7 @@ static bool handleCopyDetails(yyscan_t yyscanner,const QCString &, const StringV
 static bool handleCopyDoc(yyscan_t yyscanner,const QCString &, const StringVector &)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
-  if (yyextra->current->brief.isEmpty() && yyextra->current->doc.isEmpty())
+  if (yyextra->current->brief.stripWhiteSpace().isEmpty() && yyextra->current->doc.stripWhiteSpace().isEmpty())
   { // if we don't have a brief or detailed description yet,
     // then the @copybrief should end up in the brief description.
     // otherwise it will be copied inline (see bug691315 & bug700788)
@@ -3760,7 +3883,7 @@ static void addIlineBreak(yyscan_t yyscanner,int lineNr)
   addOutput(yyscanner, cmd);
 }
 
-static void endBrief(yyscan_t yyscanner,bool addToOutput)
+static void endBrief(yyscan_t yyscanner)
 {
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
   if (!yyextra->current->brief.stripWhiteSpace().isEmpty())
@@ -3768,8 +3891,16 @@ static void endBrief(yyscan_t yyscanner,bool addToOutput)
     // found some brief description and not just whitespace
     yyextra->briefEndsAtDot=FALSE;
     setOutput(yyscanner,OutputDoc);
-    addIline(yyscanner,yyextra->lineNr);
-    if (addToOutput) addOutput(yyscanner,yytext);
+    if (yyextra->current->doc.stripWhiteSpace().isEmpty())
+    {
+      yyextra->current->docLine = yyextra->lineNr;
+      yyextra->current->doc = "";
+    }
+    else
+    {
+      addIline(yyscanner,yyextra->lineNr);
+    }
+    addOutput(yyscanner,yytext);
   }
   else
   {

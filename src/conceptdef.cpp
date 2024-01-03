@@ -35,37 +35,39 @@ class ConceptDefImpl : public DefinitionMixin<ConceptDefMutable>
                    const QCString &name,const QCString &tagRef=QCString(),const QCString &tagFile=QCString());
    ~ConceptDefImpl();
 
-    virtual ConceptDef *resolveAlias() { return this; }
+    ConceptDef *resolveAlias() { return this; }
 
     //---------- ConceptDef
-    virtual DefType definitionType() const;
-    virtual CodeSymbolType codeSymbolType() const { return CodeSymbolType::Concept; }
-    virtual QCString getOutputFileBase() const;
-    virtual bool hasDetailedDescription() const;
-    virtual QCString displayName(bool includeScope=true) const;
-    virtual const IncludeInfo *includeInfo() const;
-    virtual ArgumentList getTemplateParameterList() const;
-    virtual QCString anchor() const;
-    virtual bool isLinkableInProject() const;
-    virtual bool isLinkable() const;
-    virtual QCString initializer() const;
+    virtual DefType definitionType() const override;
+    virtual CodeSymbolType codeSymbolType() const override { return CodeSymbolType::Concept; }
+    virtual QCString getOutputFileBase() const override;
+    virtual bool hasDetailedDescription() const override;
+    virtual QCString displayName(bool includeScope=true) const override;
+    virtual const IncludeInfo *includeInfo() const override;
+    virtual ArgumentList getTemplateParameterList() const override;
+    virtual QCString anchor() const override;
+    virtual bool isLinkableInProject() const override;
+    virtual bool isLinkable() const override;
+    virtual QCString initializer() const override;
     virtual void writeDeclarationLink(OutputList &ol,bool &found,
-                              const QCString &header,bool localNames) const;
-    virtual const NamespaceDef *getNamespaceDef() const;
-    virtual const FileDef *getFileDef() const;
-    virtual QCString title() const;
-    virtual int groupId() const;
+                              const QCString &header,bool localNames) const override;
+    virtual const NamespaceDef *getNamespaceDef() const override;
+    virtual const FileDef *getFileDef() const override;
+    virtual const ModuleDef *getModuleDef() const override;
+    virtual QCString title() const override;
+    virtual int groupId() const override;
 
     //---------- ConceptDefMutable
-    virtual void setIncludeFile(FileDef *fd,const QCString &incName,bool local,bool force);
-    virtual void setTemplateArguments(const ArgumentList &al);
-    virtual void setNamespace(NamespaceDef *nd);
-    virtual void setFileDef(FileDef *fd);
-    virtual void writeTagFile(TextStream &);
-    virtual void writeDocumentation(OutputList &);
-    virtual void setInitializer(const QCString &init);
-    virtual void findSectionsInDocumentation();
-    virtual void setGroupId(int id);
+    virtual void setIncludeFile(FileDef *fd,const QCString &incName,bool local,bool force) override;
+    virtual void setTemplateArguments(const ArgumentList &al) override;
+    virtual void setNamespace(NamespaceDef *nd) override;
+    virtual void setFileDef(FileDef *fd) override;
+    virtual void setModuleDef(ModuleDef *mod) override;
+    virtual void writeTagFile(TextStream &) override;
+    virtual void writeDocumentation(OutputList &) override;
+    virtual void setInitializer(const QCString &init) override;
+    virtual void findSectionsInDocumentation() override;
+    virtual void setGroupId(int id) override;
 
     //---------- Helpers
     void writeBriefDescription(OutputList &) const;
@@ -73,12 +75,14 @@ class ConceptDefImpl : public DefinitionMixin<ConceptDefMutable>
     void writeIncludeFiles(OutputList &ol) const;
     void writeDetailedDescription(OutputList &ol,const QCString &title) const;
     void writeDefinition(OutputList &ol,const QCString &title) const;
+    void addConceptAttributes(OutputList &ol) const;
 
   private:
     QCString                     m_fileName;
     std::unique_ptr<IncludeInfo> m_incInfo;
     NamespaceDef                *m_nspace = 0;
     FileDef                     *m_fileDef = 0;
+    ModuleDef                   *m_moduleDef = 0;
     ArgumentList                 m_tArgList;
     QCString                     m_initializer;
     int                          m_groupId = -1;
@@ -132,6 +136,8 @@ class ConceptDefAliasImpl : public DefinitionAliasMixin<ConceptDef>
     { return getCdAlias()->getNamespaceDef(); }
     virtual const FileDef *getFileDef() const
     { return getCdAlias()->getFileDef(); }
+    virtual const ModuleDef *getModuleDef() const
+    { return getCdAlias()->getModuleDef(); }
     virtual QCString title() const
     { return getCdAlias()->title(); }
     virtual void writeDeclarationLink(OutputList &ol,bool &found,
@@ -234,12 +240,12 @@ void ConceptDefImpl::setIncludeFile(FileDef *fd,const QCString &incName,bool loc
   {
     m_incInfo->fileDef     = fd;
     m_incInfo->includeName = incName;
-    m_incInfo->local       = local;
+    m_incInfo->kind        = local ? IncludeKind::IncludeLocal : IncludeKind::IncludeSystem;
   }
   if (force && !incName.isEmpty())
   {
     m_incInfo->includeName = incName;
-    m_incInfo->local       = local;
+    m_incInfo->kind        = local ? IncludeKind::IncludeLocal : IncludeKind::IncludeSystem;
   }
 }
 
@@ -263,9 +269,19 @@ void ConceptDefImpl::setFileDef(FileDef *fd)
   m_fileDef=fd;
 }
 
+void ConceptDefImpl::setModuleDef(ModuleDef *mod)
+{
+  m_moduleDef=mod;
+}
+
 const FileDef *ConceptDefImpl::getFileDef() const
 {
   return m_fileDef;
+}
+
+const ModuleDef *ConceptDefImpl::getModuleDef() const
+{
+  return m_moduleDef;
 }
 
 QCString ConceptDefImpl::title() const
@@ -348,11 +364,8 @@ void ConceptDefImpl::writeIncludeFiles(OutputList &ol) const
     {
       ol.startParagraph();
       ol.startTypewriter();
-      ol.docify("#include ");
-      if (m_incInfo->local)
-        ol.docify("\"");
-      else
-        ol.docify("<");
+      ol.docify(::includeStatement(SrcLangExt_Cpp,m_incInfo->kind));
+      ol.docify(::includeOpen(SrcLangExt_Cpp,m_incInfo->kind));
       ol.pushGeneratorState();
       ol.disable(OutputType::Html);
       ol.docify(nm);
@@ -367,10 +380,7 @@ void ConceptDefImpl::writeIncludeFiles(OutputList &ol) const
         ol.docify(nm);
       }
       ol.popGeneratorState();
-      if (m_incInfo->local)
-        ol.docify("\"");
-      else
-        ol.docify(">");
+      ol.docify(::includeClose(SrcLangExt_Cpp,m_incInfo->kind));
       ol.endTypewriter();
       ol.endParagraph();
     }
@@ -488,6 +498,19 @@ void ConceptDefImpl::writeAuthorSection(OutputList &ol) const
   ol.popGeneratorState();
 }
 
+void ConceptDefImpl::addConceptAttributes(OutputList &ol) const
+{
+  if (isExported())
+  {
+    ol.pushGeneratorState();
+    ol.disableAllBut(OutputType::Html);
+    ol.startLabels();
+    ol.writeLabel("export",false);
+    ol.endLabels();
+    ol.popGeneratorState();
+  }
+}
+
 void ConceptDefImpl::writeDocumentation(OutputList &ol)
 {
   bool generateTreeView = Config_getBool(GENERATE_TREEVIEW);
@@ -507,6 +530,7 @@ void ConceptDefImpl::writeDocumentation(OutputList &ol)
   // ---- title part
   startTitle(ol,getOutputFileBase(),this);
   ol.parseText(pageTitle);
+  addConceptAttributes(ol);
   addGroupListToTitle(ol,this);
   endTitle(ol,getOutputFileBase(),displayName());
 
@@ -571,6 +595,7 @@ void ConceptDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::FileSourceLink:
       case LayoutDocEntry::GroupClasses:
       case LayoutDocEntry::GroupConcepts:
+      case LayoutDocEntry::GroupModules:
       case LayoutDocEntry::GroupInlineClasses:
       case LayoutDocEntry::GroupNamespaces:
       case LayoutDocEntry::GroupDirs:
@@ -578,11 +603,15 @@ void ConceptDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::GroupFiles:
       case LayoutDocEntry::GroupGraph:
       case LayoutDocEntry::GroupPageDocs:
+      case LayoutDocEntry::ModuleExports:
+      case LayoutDocEntry::ModuleClasses:
+      case LayoutDocEntry::ModuleConcepts:
+      case LayoutDocEntry::ModuleUsedFiles:
       case LayoutDocEntry::DirSubDirs:
       case LayoutDocEntry::DirFiles:
       case LayoutDocEntry::DirGraph:
         err("Internal inconsistency: member %d should not be part of "
-            "LayoutDocManager::Namespace entry list\n",lde->kind());
+            "LayoutDocManager::Concept entry list\n",lde->kind());
         break;
     }
   }

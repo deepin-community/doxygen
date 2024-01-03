@@ -1,1 +1,2 @@
 debian/dh-doxygen/dh_doxygen /usr/bin
+debian/dh-doxygen/doxygen.pm /usr/share/perl5/Debian/Debhelper/Sequence/

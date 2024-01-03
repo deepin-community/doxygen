@@ -45,11 +45,7 @@
 
 void *qmemmove( void *dst, const void *src, size_t len );
 
-#if defined(_OS_WIN32_)
-#define qsnprintf _snprintf
-#else
 #define qsnprintf snprintf
-#endif
 
 //! Returns a copy of a string \a s.
 //! Note that memory is passed to the caller, use qstrfree() to release.
@@ -62,12 +58,12 @@ inline uint32_t qstrlen( const char *str )
 { return str ? static_cast<uint32_t>(strlen(str)) : 0; }
 
 inline char *qstrcpy( char *dst, const char *src )
-{ return src ? strcpy(dst, src) : 0; }
+{ return src ? strcpy(dst, src) : nullptr; }
 
-char * qstrncpy(char *dst,const char *src, size_t len);
+char *qstrncpy(char *dst,const char *src, size_t len);
 
 inline bool qisempty( const char *s)
-{ return s==0 || *s==0; }
+{ return s==nullptr || *s=='\0'; }
 
 inline int qstrcmp( const char *str1, const char *str2 )
 { return (str1 && str2) ? strcmp(str1,str2) :     // both non-empty
@@ -88,6 +84,7 @@ int qstricmp( const char *str1, const char *str2 );
 
 int qstrnicmp( const char *str1, const char *str2, size_t len );
 
+using JavaCCString = std::basic_string<unsigned char>;
 
 /** This is an alternative implementation of QCString. It provides basically
  *  the same functions but uses std::string as the underlying string type
@@ -105,6 +102,19 @@ class QCString
     explicit QCString( const std::string &s ) : m_rep(s) {}
 
     QCString( std::string &&s) : m_rep(std::move(s)) {}
+
+    /** For converting a JavaCC string */
+    QCString( const JavaCCString &s)
+    {
+      m_rep.resize(s.size());
+      memcpy(m_rep.data(),s.data(),s.size());
+    }
+    QCString &operator=( const JavaCCString &s)
+    {
+      m_rep.resize(s.size());
+      memcpy(m_rep.data(),s.data(),s.size());
+      return *this;
+    }
 
     /** creates a string with room for size characters
      *  @param[in] size the number of character to allocate (also counting the 0-terminator!)

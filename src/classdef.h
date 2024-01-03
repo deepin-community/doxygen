@@ -38,7 +38,6 @@ class NamespaceDef;
 class MemberDef;
 class ExampleList;
 class MemberNameInfoLinkedMap;
-class PackageDef;
 class GroupDef;
 struct IncludeInfo;
 class ClassDefImpl;
@@ -47,6 +46,7 @@ class ClassDefMutable;
 class UsesClassList;
 class ConstraintClassList;
 class MemberGroupList;
+class ModuleDef;
 
 /** Class that contains information about an inheritance relation.
  */
@@ -214,6 +214,10 @@ class ClassDef : public Definition
      *  Should not return 0 (but it might be a good idea to check anyway).
      */
     virtual FileDef      *getFileDef() const = 0;
+
+    /** Returns the C++20 module in which this compound's definition can be found.
+     */
+    virtual ModuleDef    *getModuleDef() const = 0;
 
     /** Returns the member with the given name */
     virtual const MemberDef *getMemberByName(const QCString &) const = 0;
@@ -396,8 +400,6 @@ class ClassDef : public Definition
                  int lt2=-1,bool invert=FALSE,bool showAlways=FALSE) const = 0;
     virtual void addGroupedInheritedMembers(OutputList &ol,MemberListType lt,
                  const ClassDef *inheritedFrom,const QCString &inheritId) const = 0;
-
-
 };
 
 class ClassDefMutable : public DefinitionMutable, public ClassDef
@@ -409,6 +411,7 @@ class ClassDefMutable : public DefinitionMutable, public ClassDef
 
     virtual void setIncludeFile(FileDef *fd,const QCString &incName,bool local,bool force) = 0;
     virtual void setFileDef(FileDef *fd) = 0;
+    virtual void setModuleDef(ModuleDef *md) = 0;
     virtual void setSubGrouping(bool enabled) = 0;
     virtual void setProtection(Protection p) = 0;
     virtual void setGroupDefForAllMembers(GroupDef *g,Grouping::GroupPri_t pri,const QCString &fileName,int startLine,bool hasDocs) = 0;
@@ -426,6 +429,10 @@ class ClassDefMutable : public DefinitionMutable, public ClassDef
     virtual void setMetaData(const QCString &md) = 0;
     virtual void setRequiresClause(const QCString &req) = 0;
     virtual void addQualifiers(const StringVector &qualifiers) = 0;
+
+    // collaboration graph related members
+    virtual bool hasCollaborationGraph() const = 0;
+    virtual void enableCollaborationGraph(bool e) = 0;
 
     //-----------------------------------------------------------------------------------
     // --- actions ----

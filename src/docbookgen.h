@@ -69,6 +69,8 @@ class DocbookCodeGenerator
         const QCString &anchorId,int l, bool writeLineAnchor);
     void startCodeFragment(const QCString &style);
     void endCodeFragment(const QCString &style);
+    void startFold(int,const QCString &,const QCString &) {}
+    void endFold() {}
 
     void setRelativePath(const QCString &path) { m_relPath = path; }
     void setSourceFileName(const QCString &sourceFileName) { m_sourceFileName = sourceFileName; }
@@ -249,7 +251,7 @@ class DocbookGenerator : public OutputGenerator
     void writeSplitBar(const QCString &){DB_GEN_EMPTY};
     void writeNavigationPath(const QCString &){DB_GEN_NEW};
     void writeLogo(){DB_GEN_NEW};
-    void writeQuickLinks(bool,HighlightedItem,const QCString &){DB_GEN_EMPTY};
+    void writeQuickLinks(bool,HighlightedItem,const QCString &,bool){DB_GEN_EMPTY};
     void writeSummaryLink(const QCString &,const QCString &,const QCString &,bool){DB_GEN_EMPTY};
     void startContents(){DB_GEN_EMPTY};
     void endContents(){DB_GEN_EMPTY};

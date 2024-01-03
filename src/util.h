@@ -103,18 +103,30 @@ void linkifyText(const TextGeneratorIntf &ol,
 
 QCString fileToString(const QCString &name,bool filter=FALSE,bool isSourceCode=FALSE);
 
-bool getDefs(const QCString &scopeName,
-                    const QCString &memberName,
-                    const QCString &args,
-                    const MemberDef *&md,
-                    const ClassDef *&cd,
-                    const FileDef *&fd,
-                    const NamespaceDef *&nd,
-                    const GroupDef *&gd,
-                    bool forceEmptyScope=FALSE,
-                    const FileDef *currentFile=0,
-                    bool checkCV=FALSE
-                   );
+struct GetDefInput
+{
+  GetDefInput(const QCString &scName,const QCString &memName,const QCString &a) :
+    scopeName(scName),memberName(memName),args(a) {}
+  QCString scopeName;
+  QCString memberName;
+  QCString args;
+  bool forceEmptyScope = false;
+  const FileDef *currentFile = 0;
+  bool checkCV = false;
+  bool insideCode = false;
+};
+
+struct GetDefResult
+{
+  bool found = false;
+  const MemberDef    *md=0;
+  const ClassDef     *cd=0;
+  const FileDef      *fd=0;
+  const NamespaceDef *nd=0;
+  const GroupDef     *gd=0;
+};
+
+GetDefResult getDefs(const GetDefInput &input);
 
 QCString getFileFilter(const QCString &name,bool isSourceCode);
 
@@ -174,6 +186,7 @@ struct SelectionMarkerInfo
 };
 
 QCString selectBlocks(const QCString& s,const SelectionBlockList &blockList, const SelectionMarkerInfo &markerInfo);
+void checkBlocks(const QCString& s,const QCString fileName, const SelectionMarkerInfo &markerInfo);
 
 QCString removeEmptyLines(const QCString &s);
 
@@ -344,6 +357,7 @@ inline int computeQualifiedIndex(const QCString &name)
 void addDirPrefix(QCString &fileName);
 
 QCString relativePathToRoot(const QCString &name);
+QCString determineAbsoluteIncludeName(const QCString &curFile,const QCString &incFileName);
 
 void createSubDirs(const Dir &d);
 void clearSubDirs(const Dir &d);
@@ -367,16 +381,9 @@ bool checkIfTypedef(const Definition *scope,const FileDef *fileScope,const QCStr
 
 QCString parseCommentAsText(const Definition *scope,const MemberDef *member,const QCString &doc,const QCString &fileName,int lineNr);
 
-QCString transcodeCharacterStringToUTF8(const QCString &inputEncoding,const QCString &input);
+bool transcodeCharacterStringToUTF8(std::string &input,const char *inputEncoding);
 
 QCString recodeString(const QCString &str,const char *fromEncoding,const char *toEncoding);
-
-QCString extractAliasArgs(const QCString &args,size_t pos);
-
-int countAliasArguments(const QCString &argList);
-
-QCString resolveAliasCmd(const QCString &aliasCmd);
-std::string expandAlias(const std::string &aliasName,const std::string &aliasValue);
 
 void writeTypeConstraints(OutputList &ol,const Definition *d,const ArgumentList &al);
 

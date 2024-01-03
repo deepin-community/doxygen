@@ -76,8 +76,9 @@ static const char *stateToString(int state);
 
 struct preYY_CondCtx
 {
-  preYY_CondCtx(int line,const QCString &id,bool b)
-    : lineNr(line), sectionId(id), skip(b) {}
+  preYY_CondCtx(const QCString &file,int line,const QCString &id,bool b)
+    : fileName(file), lineNr(line), sectionId(id), skip(b) {}
+  QCString fileName;
   int lineNr;
   QCString sectionId;
   bool skip;
@@ -1681,13 +1682,20 @@ WSopt [ \t\r]*
                                                  "expected formal parameter after # in macro definition '%s': '%s'",
                                                  qPrint(yyextra->defName),qPrint(yyextra->defLitText.stripWhiteSpace()));
                                           }
-                                          yyextra->defLitText+=yytext;
                                           if (!comment.isEmpty())
                                           {
                                             outputString(yyscanner,comment);
                                             yyextra->defLitText=yyextra->defLitText.left(yyextra->defLitText.length()-comment.length()-1);
                                           }
-                                          outputChar(yyscanner,'\n');
+                                          if (yyextra->defLitText.find('\n')!=-1)
+                                          {
+                                            outputString(yyscanner,"/*#end#*/\n");
+                                          }
+                                          else
+                                          {
+                                            outputChar(yyscanner,'\n');
+                                          }
+                                          yyextra->defLitText+=yytext;
                                           Define *def=0;
                                           //printf("Define name='%s' text='%s' litTexti='%s'\n",qPrint(yyextra->defName),qPrint(yyextra->defText),qPrint(yyextra->defLitText));
                                           if (yyextra->includeStack.empty() || yyextra->curlyCount>0)
@@ -1960,7 +1968,7 @@ static void decrLevel(yyscan_t yyscanner)
   }
   else
   {
-    warn(state->fileName,state->yyLineNr,"More #endif's than #if's found.\n");
+    warn(state->fileName,state->yyLineNr,"More #endif's than #if's found.");
   }
 }
 
@@ -1969,7 +1977,7 @@ static bool otherCaseDone(yyscan_t yyscanner)
   YY_EXTRA_TYPE state = preYYget_extra(yyscanner);
   if (state->levelGuard.empty())
   {
-    warn(state->fileName,state->yyLineNr,"Found an #else without a preceding #if.\n");
+    warn(state->fileName,state->yyLineNr,"Found an #else without a preceding #if.");
     return TRUE;
   }
   else
@@ -3247,44 +3255,6 @@ static void determineBlockName(yyscan_t yyscanner)
   }
 }
 
-static QCString determineAbsoluteIncludeName(const QCString &curFile,const QCString &incFileName)
-{
-  bool searchIncludes = Config_getBool(SEARCH_INCLUDES);
-  QCString absIncFileName = incFileName;
-  FileInfo fi(curFile.str());
-  if (fi.exists())
-  {
-    QCString absName = QCString(fi.dirPath(TRUE))+"/"+incFileName;
-    FileInfo fi2(absName.str());
-    if (fi2.exists())
-    {
-      absIncFileName=fi2.absFilePath();
-    }
-    else if (searchIncludes) // search in INCLUDE_PATH as well
-    {
-      const StringVector &includePath = Config_getList(INCLUDE_PATH);
-      for (const auto &incPath : includePath)
-      {
-        FileInfo fi3(incPath);
-        if (fi3.exists() && fi3.isDir())
-        {
-          absName = QCString(fi3.absFilePath())+"/"+incFileName;
-          //printf("trying absName=%s\n",qPrint(absName));
-          FileInfo fi4(absName.str());
-          if (fi4.exists())
-          {
-            absIncFileName=fi4.absFilePath();
-            break;
-          }
-          //printf( "absIncFileName = %s\n", qPrint(absIncFileName) );
-        }
-      }
-    }
-    //printf( "absIncFileName = %s\n", qPrint(absIncFileName) );
-  }
-  return absIncFileName;
-}
-
 static void readIncludeFile(yyscan_t yyscanner,const QCString &inc)
 {
   AUTO_TRACE("inc={}",inc);
@@ -3441,7 +3411,7 @@ static void startCondSection(yyscan_t yyscanner,const QCString &sectId)
   //printf("startCondSection: skip=%d stack=%d\n",state->skip,state->condStack.size());
   CondParser prs;
   bool expResult = prs.parse(state->fileName.data(),state->yyLineNr,sectId.data());
-  state->condStack.emplace(std::make_unique<preYY_CondCtx>(state->yyLineNr,sectId,state->skip));
+  state->condStack.emplace(std::make_unique<preYY_CondCtx>(state->fileName,state->yyLineNr,sectId,state->skip));
   if (!expResult)
   {
     state->skip=TRUE;
@@ -3809,7 +3779,7 @@ void Preprocessor::processFile(const QCString &fileName,BufStr &input,BufStr &ou
     const std::unique_ptr<preYY_CondCtx> &ctx = state->condStack.top();
     QCString sectionInfo = " ";
     if (ctx->sectionId!=" ") sectionInfo.sprintf(" with label '%s' ",qPrint(ctx->sectionId.stripWhiteSpace()));
-    warn(fileName,ctx->lineNr,"Conditional section%sdoes not have "
+    warn(ctx->fileName,ctx->lineNr,"Conditional section%sdoes not have "
         "a corresponding \\endcond command within this file.",qPrint(sectionInfo));
     state->condStack.pop();
   }
@@ -3856,13 +3826,29 @@ void Preprocessor::processFile(const QCString &fileName,BufStr &input,BufStr &ou
     std::lock_guard<std::mutex> lock(g_updateGlobals);
     for (const auto &inc : state->includeRelations)
     {
+      auto toKind = [](bool local,bool imported) -> IncludeKind
+      {
+        if (local)
+        {
+          if (imported)
+          {
+            return IncludeKind::ImportLocalObjC;
+          }
+          return IncludeKind::IncludeLocal;
+        }
+        else if (imported)
+        {
+          return IncludeKind::ImportSystemObjC;
+        }
+        return IncludeKind::IncludeSystem;
+      };
       if (inc->fromFileDef)
       {
-        inc->fromFileDef->addIncludeDependency(inc->toFileDef,inc->includeName,inc->local,inc->imported);
+        inc->fromFileDef->addIncludeDependency(inc->toFileDef,inc->includeName,toKind(inc->local,inc->imported));
       }
       if (inc->toFileDef && inc->fromFileDef)
       {
-        inc->toFileDef->addIncludedByDependency(inc->fromFileDef,inc->fromFileDef->docName(),inc->local,inc->imported);
+        inc->toFileDef->addIncludedByDependency(inc->fromFileDef,inc->fromFileDef->docName(),toKind(inc->local,inc->imported));
       }
     }
     // add the macro definition for this file to the global map
