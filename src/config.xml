@@ -711,8 +711,8 @@ Go to the <a href="commands.html">next</a> section or return to the
  Note: Every identifier is unique.
 ]]>
       </docs>
-      <value name="DOXYGEN" desc="Use a fixed 'autotoc_md' string followed by a sequence number starting at 0."/>
-      <value name="GITHUB" desc="Use the lower case version of title with any whitespace replaced by '-' and punctations characters removed."/>
+      <value name="DOXYGEN" desc="use a fixed 'autotoc_md' string followed by a sequence number starting at 0"/>
+      <value name="GITHUB" desc="use the lower case version of title with any whitespace replaced by '-' and punctuation characters removed"/>
     </option>
     <option type='bool' id='AUTOLINK_SUPPORT' defval='1'>
       <docs>
@@ -1540,8 +1540,11 @@ FILE_VERSION_FILTER = "cleartool desc -fmt \%Vn"
       <value name='*.c'/>
       <value name='*.cc'/>
       <value name='*.cxx'/>
+      <value name='*.cxxm'/>
       <value name='*.cpp'/>
+      <value name='*.cppm'/>
       <value name='*.c++'/>
+      <value name='*.c++m'/>
       <value name='*.java'/>
       <value name='*.ii'/>
       <value name='*.ixx'/>
@@ -1556,6 +1559,7 @@ FILE_VERSION_FILTER = "cleartool desc -fmt \%Vn"
       <value name='*.hxx'/>
       <value name='*.hpp'/>
       <value name='*.h++'/>
+      <value name='*.ixx'/>
       <value name='*.l'/>
       <value name='*.cs'/>
       <value name='*.d'/>
@@ -2257,6 +2261,14 @@ hr.footer {
  If the \c HTML_DYNAMIC_SECTIONS tag is set to \c YES then the generated HTML
  documentation will contain sections that can be hidden and shown after the
  page has loaded.
+]]>
+      </docs>
+    </option>
+    <option type='bool' id='HTML_CODE_FOLDING' defval='1' depends='GENERATE_HTML'>
+      <docs>
+<![CDATA[
+ If the \c HTML_CODE_FOLDING tag is set to \c YES then classes and functions can
+ be dynamically folded and expanded in the generated HTML source code.
 ]]>
       </docs>
     </option>
@@ -3184,7 +3196,7 @@ The following block name is set based on whether or not a feature is used in the
     <option type='enum' id='LATEX_BATCHMODE' defval='NO' depends='GENERATE_LATEX'>
       <docs>
 <![CDATA[
- The \c LATEX_BATCHMODE tag ignals the behavior of \f$\mbox{\LaTeX}\f$ in case of an error.
+ The \c LATEX_BATCHMODE tag signals the behavior of \f$\mbox{\LaTeX}\f$ in case of an error.
 ]]>
       </docs>
       <value name="NO" desc='same as ERROR_STOP' />
@@ -3410,39 +3422,30 @@ front of it.
       </docs>
     </option>
   </group>
-  <group name='Sqlite3' setting='USE_SQLITE3' docs='Configuration options related to Sqlite3 output'>
-    <option type='bool' id='GENERATE_SQLITE3' setting='USE_SQLITE3' defval='0'>
+  <group name='Sqlite3' docs='Configuration options related to Sqlite3 output'>
+    <option type='bool' id='GENERATE_SQLITE3' defval='0'>
       <docs>
 <![CDATA[
 If the \c GENERATE_SQLITE3 tag is set to \c YES doxygen will generate a
 \c Sqlite3 database with symbols found by doxygen stored in tables.
-
-  @note The availability of this option depends on whether or not doxygen
-  was generated with the `-Duse_sqlite3=ON` option for CMake.
 ]]>
       </docs>
     </option>
-    <option type='string' id='SQLITE3_OUTPUT' format='dir' defval='sqlite3' setting='USE_SQLITE3' depends='GENERATE_SQLITE3'>
+    <option type='string' id='SQLITE3_OUTPUT' format='dir' defval='sqlite3' depends='GENERATE_SQLITE3'>
       <docs>
 <![CDATA[
 The \c SQLITE3_OUTPUT tag is used to specify where the \c Sqlite3 database will be put.
 If a relative path is entered the value of \ref cfg_output_directory "OUTPUT_DIRECTORY" will be
 put in front of it.
-
-  @note The availability of this option depends on whether or not doxygen
-  was generated with the `-Duse_sqlite3=ON` option for CMake.
 ]]>
       </docs>
     </option>
-    <option type='bool' id='SQLITE3_RECREATE_DB' defval='1' setting='USE_SQLITE3' depends='GENERATE_SQLITE3'>
+    <option type='bool' id='SQLITE3_RECREATE_DB' defval='1' depends='GENERATE_SQLITE3'>
       <docs>
 <![CDATA[
 The \c SQLITE3_OVERWRITE_DB tag is set to \c YES, the existing doxygen_sqlite3.db
 database file will be recreated with each doxygen run.
 If set to \c NO, doxygen will warn if an a database file is already found and not modify it.
-
-  @note The availability of this option depends on whether or not doxygen
-  was generated with the `-Duse_sqlite3=ON` option for CMake.
 ]]>
       </docs>
     </option>
@@ -3628,9 +3631,9 @@ where `loc1` and `loc2` can be relative or absolute paths or URLs.
     <option type='bool' id='ALLEXTERNALS' defval='0'>
       <docs>
 <![CDATA[
- If the \c ALLEXTERNALS tag is set to \c YES, all external class will be listed
- in the class index. If set to \c NO, only the inherited external classes
- will be listed.
+ If the \c ALLEXTERNALS tag is set to \c YES, all external classes and namespaces 
+ will be listed in the class and namespace index. 
+ If set to \c NO, only the inherited external classes will be listed.
 ]]>
       </docs>
     </option>
@@ -3638,7 +3641,7 @@ where `loc1` and `loc2` can be relative or absolute paths or URLs.
       <docs>
 <![CDATA[
  If the \c EXTERNAL_GROUPS tag is set to \c YES, all external groups will be listed
- in the modules index. If set to \c NO, only the current project's groups will
+ in the topic index. If set to \c NO, only the current project's groups will
  be listed.
 ]]>
       </docs>
@@ -3758,6 +3761,10 @@ where `loc1` and `loc2` can be relative or absolute paths or URLs.
  will generate a graph for each documented class showing the direct and
  indirect implementation dependencies (inheritance, containment, and
  class references variables) of the class with other documented classes.
+ Explicit enabling a collaboration graph, when \c COLLABORATION_GRAPH is set to \c NO, can be
+ accomplished by means of the command \ref cmdcollaborationgraph "\\collaborationgraph".
+ Disabling a collaboration graph can be accomplished by means of the command
+ \ref cmdhidecollaborationgraph "\\hidecollaborationgraph".
 ]]>
       </docs>
     </option>
@@ -3766,6 +3773,10 @@ where `loc1` and `loc2` can be relative or absolute paths or URLs.
 <![CDATA[
  If the \c GROUP_GRAPHS tag is set to \c YES then doxygen
  will generate a graph for groups, showing the direct groups dependencies.
+ Explicit enabling a group dependency graph, when \c GROUP_GRAPHS is set to \c NO, can be
+ accomplished by means of the command \ref cmdgroupgraph "\\groupgraph".
+ Disabling a directory graph can be accomplished by means of the command
+ \ref cmdhidegroupgraph "\\hidegroupgraph".
 
  See also the chapter \ref grouping "Grouping" in the manual.
 ]]>
@@ -3836,6 +3847,10 @@ UML notation for the relationships.
  tags are set to \c YES then doxygen will generate a graph for each documented file
  showing the direct and indirect include dependencies of the file with other
  documented files.
+ Explicit enabling an include graph, when \c INCLUDE_GRAPH is is set to \c NO, can be
+ accomplished by means of the command \ref cmdincludegraph "\\includegraph".
+ Disabling an include graph can be accomplished by means of the command
+ \ref cmdhideincludegraph "\\hideincludegraph".
 ]]>
       </docs>
     </option>
@@ -3847,6 +3862,10 @@ UML notation for the relationships.
  tags are set to \c YES then doxygen will generate a graph for each documented file
  showing the direct and indirect include dependencies of the file with other
  documented files.
+ Explicit enabling an included by graph, when \c INCLUDED_BY_GRAPH is set to \c NO, can be
+ accomplished by means of the command \ref cmdincludedbygraph "\\includedbygraph".
+ Disabling an included by graph can be accomplished by means of the command
+ \ref cmdhideincludedbygraph "\\hideincludedbygraph".
 ]]>
       </docs>
     </option>
@@ -3891,6 +3910,11 @@ UML notation for the relationships.
  to \c YES then doxygen will show the dependencies a directory has on other directories
  in a graphical way. The dependency relations are determined by the \c \#include
  relations between the files in the directories.
+ Explicit enabling a directory graph, when \c DIRECTORY_GRAPH is set to \c NO, can be
+ accomplished by means of the command \ref cmddirectorygraph "\\directorygraph".
+ Disabling a directory graph can be accomplished by means of the command
+ \ref cmdhidedirectorygraph "\\hidedirectorygraph".
+
 ]]>
       </docs>
     </option>

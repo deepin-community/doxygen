@@ -51,6 +51,8 @@ class HtmlCodeGenerator
     void writeCodeAnchor(const QCString &anchor);
     void startCodeFragment(const QCString &style);
     void endCodeFragment(const QCString &);
+    void startFold(int,const QCString &,const QCString &);
+    void endFold();
 
     void setRelativePath(const QCString &path);
   private:
@@ -222,7 +224,7 @@ class HtmlGenerator : public OutputGenerator
     void writeSplitBar(const QCString &name);
     void writeNavigationPath(const QCString &s);
     void writeLogo();
-    void writeQuickLinks(bool compact,HighlightedItem hli,const QCString &file);
+    void writeQuickLinks(bool compact,HighlightedItem hli,const QCString &file,bool needsFolding);
     void writeSummaryLink(const QCString &file,const QCString &anchor,const QCString &title,bool first);
     void startContents();
     void endContents();

@@ -121,10 +121,10 @@ class MemberList : public MemberVector
     void countDocMembers();
     int countInheritableMembers(const ClassDef *inheritedFrom) const;
     void writePlainDeclarations(OutputList &ol,bool inGroup,
-               const ClassDef *cd,const NamespaceDef *nd,const FileDef *fd, const GroupDef *gd,
+               const ClassDef *cd,const NamespaceDef *nd,const FileDef *fd, const GroupDef *gd,const ModuleDef *mod,
                int indentLevel,const ClassDef *inheritedFrom,const QCString &inheritId) const;
     void writeDeclarations(OutputList &ol,
-               const ClassDef *cd,const NamespaceDef *nd,const FileDef *fd,const GroupDef *gd,
+               const ClassDef *cd,const NamespaceDef *nd,const FileDef *fd,const GroupDef *gd,const ModuleDef *mod,
                const QCString &title,const QCString &subtitle,
                bool showEnumValues=FALSE,bool showInline=FALSE,
                const ClassDef *inheritedFrom=0,MemberListType lt=MemberListType_pubMethods) const;
@@ -134,7 +134,7 @@ class MemberList : public MemberVector
     void writeSimpleDocumentation(OutputList &ol,const Definition *container) const;
     void writeDocumentationPage(OutputList &ol,
                const QCString &scopeName, const DefinitionMutable *container, int hierarchyLevel=0) const;
-    void writeTagFile(TextStream &,bool useQualifiedName=false);
+    void writeTagFile(TextStream &,bool useQualifiedName=false,bool showNamespaceMembers=true);
     bool declVisible() const;
     void addMemberGroup(MemberGroup *mg);
     void addListReferences(Definition *def);

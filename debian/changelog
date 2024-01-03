@@ -1,24 +1,51 @@
-doxygen (1.9.7-0deepin4) unstable; urgency=medium
+doxygen (1.9.8+ds-2) unstable; urgency=medium
 
-  * Apply patch from upstream to fix markdown ref.
-    See: https://github.com/doxygen/doxygen/issues/10056,
-    https://github.com/doxygen/doxygen/issues/10089 and
-    https://github.com/deepin-community/netcdf/pull/1#issuecomment-1689493699
+  * Incorporate upstream fix for linking doxyparse to spdlog
 
- -- Tianyu Chen <sweetyfish@deepin.org>  Wed, 23 Aug 2023 16:21:12 +0800
+  [ Samuel Thibault ]
+  * Move mat2 build-dep to build-dep-indep (Closes: #1055533)
 
-doxygen (1.9.7-0deepin3) unstable; urgency=medium
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Thu, 07 Dec 2023 13:21:02 +0100
 
-  [ Xiang Zelong ]
-  * new upstream release
+doxygen (1.9.8+ds-1) unstable; urgency=medium
 
- -- Xiang Zelong <xiangzelong@deepin.org>  Thu, 06 Jul 2023 13:45:09 +0800
+  * New upstream version. Closes: #389492, #1040864.
+  * Enable sqlite3 and add required build-dep
+  * Use system spdlog
+  * Add required libfmt-dev build dep
 
-doxygen (1.9.4.1-deepin-1) unstable; urgency=medium
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Sun, 03 Sep 2023 18:27:51 +0200
 
-  * Use gcc for riscv64
+doxygen (1.9.4-4) unstable; urgency=medium
 
- -- Han Gao <gaohan@iscas.ac.cn>  Thu, 08 Sep 2022 11:49:55 +0800
+  [ Helge Deller ]
+  * Enable large file support (Closes: #1017504)
+
+  [ Samuel Thibault ]
+  * Fix build on GNU/Hurd (Closes: #1020918)
+
+  [ Debian Janitor ]
+  * Remove constraints unnecessary since buster (oldstable):
+    + Build-Depends: Drop dependency on essential package dpkg-dev (>= 1.17.14).
+    + Build-Depends: Drop versioned constraint on bison (>= 1.875a).
+    + Build-Depends: Drop versioned constraint on libxapian-dev (>= 1.2.21-1.2).
+    + doxygen-doc: Drop conflict with removed package doxygen (<< 1.2.14) in
+      Replaces.
+    + doxygen-gui: Drop conflict with removed package doxygen (<< 1.2.14) in
+      Replaces.
+
+  [ Andrea Pappacoda ]
+  * d/control: provide dh-sequence-doxygen (Closes: #799543)
+
+ -- Paolo Greppi <paolo.greppi@libpf.com>  Wed, 11 Jan 2023 15:18:43 +0100
+
+doxygen (1.9.4-3.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Add upstream fix for typo in generated Makefile for LaTeX.
+    (Closes: #1015864)
+
+ -- Adrian Bunk <bunk@debian.org>  Sat, 15 Oct 2022 15:23:30 +0300
 
 doxygen (1.9.4-3) unstable; urgency=medium
 

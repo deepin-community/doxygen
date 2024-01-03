@@ -32,7 +32,6 @@ class ClassLinkedRefMap;
 class ConceptLinkedRefMap;
 class MemberDef;
 class NamespaceDef;
-class NamespaceDef;
 class NamespaceDefMutable;
 
 // --- Set of namespaces
@@ -70,6 +69,7 @@ class NamespaceDef : public Definition
     virtual bool isInline() const = 0;
     virtual bool isLinkableInProject() const = 0;
     virtual bool isLinkable() const = 0;
+    virtual bool isVisibleInHierarchy() const = 0;
     virtual bool hasDetailedDescription() const = 0;
     virtual const Definition *findInnerCompound(const QCString &name) const = 0;
     virtual bool subGrouping() const = 0;

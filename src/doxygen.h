@@ -28,7 +28,6 @@
 
 #define THREAD_LOCAL thread_local
 #define AtomicInt    std::atomic_int
-#define AtomicBool   std::atomic_bool
 
 class RefList;
 class PageLinkedMap;
@@ -36,7 +35,6 @@ class PageDef;
 class SearchIndexIntf;
 class ParserManager;
 class BufStr;
-class CiteDict;
 class MemberDef;
 class GroupDef;
 class GroupLinkedMap;
@@ -50,9 +48,6 @@ class NamespaceLinkedMap;
 class NamespaceDef;
 class DirRelationLinkedMap;
 class IndexList;
-class FormulaList;
-class FormulaDict;
-class FormulaNameDict;
 class Preprocessor;
 struct MemberGroupInfo;
 class NamespaceDefMutable;
@@ -79,6 +74,8 @@ struct InputFileEncoding
 using InputFileEncodingList = std::vector<InputFileEncoding>;
 
 using ClangUsrMap = std::unordered_map<std::string,const Definition *>;
+
+using StaticInitMap = std::unordered_map<std::string,BodyInfo>;
 
 /*! \brief This class serves as a namespace for global variables used by doxygen.
  *
@@ -107,7 +104,6 @@ class Doxygen
     static GroupLinkedMap           *groupLinkedMap;
     static NamespaceLinkedMap       *namespaceLinkedMap;
     static StringMap                 tagDestinationMap;
-    static StringMap                 aliasMap;
     static MemberGroupInfoMap        memberGroupInfoMap;
     static StringUnorderedSet        expandAsDefinedSet;
     static std::unique_ptr<NamespaceDef> globalNamespaceDef;
@@ -134,18 +130,8 @@ class Doxygen
     static InputFileEncodingList     inputFileEncodingList;
     static std::mutex                countFlowKeywordsMutex;
     static std::mutex                addExampleMutex;
+    static StaticInitMap             staticInitMap;
 };
-
-/** Deleter that only deletes an object if doxygen is not already terminating */
-template<class T>
-struct NonTerminatingDeleter
-{
-  void operator()(T *obj)
-  {
-    if (!Doxygen::terminating) delete obj;
-  }
-};
-
 
 void initDoxygen();
 void readConfiguration(int argc, char **argv);
@@ -153,7 +139,6 @@ void checkConfiguration();
 void adjustConfiguration();
 void parseInput();
 void generateOutput();
-void readAliases();
 void cleanUpDoxygen();
 void readFileOrDirectory(const QCString &s,
                         FileNameLinkedMap *fnDict,
@@ -167,6 +152,5 @@ void readFileOrDirectory(const QCString &s,
                         StringUnorderedSet *killSet = 0,
                         StringSet *paths = 0
                        );
-void copyAndFilterFile(const char *fileName,BufStr &dest);
 
 #endif

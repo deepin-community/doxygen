@@ -38,6 +38,7 @@ typedef yyguts_t *yyscan_t;
 #include "config.h"
 #include "doxygen.h"
 #include "util.h"
+#include "aliases.h"
 #include "condparser.h"
 
 #include <assert.h>
@@ -1163,7 +1164,7 @@ static void handleCondSectionId(yyscan_t yyscanner,const char *expression)
 static void replaceAliases(yyscan_t yyscanner,const QCString &s)
 {
   QCString result = resolveAliasCmd(s);
-  //printf("replaceAliases(%s)->'%s'\n",s,result.data());
+  //printf("replaceAliases(%s)->'%s'\n",qPrint(s),qPrint(result));
   copyToOutput(yyscanner,result.data(),result.length());
 }
 

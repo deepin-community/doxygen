@@ -50,6 +50,7 @@ typedef yyguts_t *yyscan_t;
 #include "language.h"
 #include "commentscan.h"
 #include "arguments.h"
+#include "moduledef.h"
 
 #include "clangparser.h"
 #include "markdown.h"
@@ -99,6 +100,7 @@ struct scannerYY_state
   int              lastModifierContext = 0;
   Protection       protection = Protection::Public;
   Protection       baseProt = Protection::Public;
+  bool             exported = false;
   int              sharpCount   = 0 ;
   int              roundCount   = 0 ;
   int              curlyCount   = 0 ;
@@ -221,6 +223,7 @@ static const char *stateToString(int state);
 
 // forward declarations for stateless functions
 static inline int computeIndent(const char *s,int startIndent);
+static inline void initMethodProtection(yyscan_t yyscanner,Protection prot);
 static QCString stripQuotes(const char *s);
 static bool nameIsOperator(QCString &name);
 void fixArgumentListForJavaScript(ArgumentList &al);
@@ -279,14 +282,15 @@ ASSIGNOP  "="|"*="|"/="|"%="|"+="|"-="|"<<="|">>="|"&="|"^="|"|="
 LOGICOP   "=="|"!="|">"|"<"|">="|"<="|"&&"|"||"|"!"|"<=>"
 BITOP     "&"|"|"|"^"|"<<"|">>"|"~"
 OPERATOR  "operator"{B}*({ARITHOP}|{ASSIGNOP}|{LOGICOP}|{BITOP})
+MODULE_ID ({ID}".")*{ID}
 
   /* no comment start / end signs inside square brackets */
 NCOMM [^/\*]
-  // C start comment 
+  // C start comment
 CCS   "/\*"
   // C end comment
 CCE   "*\/"
-  // Cpp comment 
+  // Cpp comment
 CPPC  "/\/"
   // doxygen C start comment
 DCOMMC ("/\*!"|"/\**")
@@ -438,6 +442,7 @@ NONLopt [^\n]*
 %x      RawString
 %x      RawGString
 %x      CSString
+%x      CppProt
 
 %x      IDLAttribute
 %x      IDLProp
@@ -475,6 +480,10 @@ NONLopt [^\n]*
  /** Object-C Deprecated */
 %x      Deprecated_round
 
+
+  /** C++20 modules */
+%x      ModuleName
+%x      ModuleImport
 %%
 
 <*>"DEPRECATED_ATTRIBUTE"               { // Object-C attribute
@@ -590,82 +599,41 @@ NONLopt [^\n]*
                                             REJECT;
                                         }
 <FindMembers>{B}*("properties"){BN}*":"{BN}*  { // IDL or Borland C++ builder property
+                                          initMethodProtection(yyscanner,Protection::Public);
                                           yyextra->current->mtype = yyextra->mtype = MethodTypes::Property;
-                                          yyextra->current->protection = yyextra->protection = Protection::Public ;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
                                         }
 
-<FindMembers>{B}*"k_dcop"{BN}*":"{BN}*  { yyextra->current->mtype = yyextra->mtype = MethodTypes::DCOP;
-                                          yyextra->current->protection = yyextra->protection = Protection::Public ;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+<FindMembers>{B}*"k_dcop"{BN}*":"{BN}*  {
+                                          initMethodProtection(yyscanner,Protection::Public);
+                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::DCOP;
                                         }
 
-<FindMembers>{B}*("signals"|"Q_SIGNALS"){BN}*":"{BN}* { yyextra->current->mtype = yyextra->mtype = MethodTypes::Signal;
-
-                                          yyextra->current->protection = yyextra->protection = Protection::Public ;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+<FindMembers>{B}*("signals"|"Q_SIGNALS"){BN}*":"{BN}* {
+                                          initMethodProtection(yyscanner,Protection::Public);
+                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Signal;
                                         }
 
 <FindMembers>{B}*"public"{BN}*("slots"|"Q_SLOTS"){BN}*":"{BN}* {
-                                          yyextra->current->protection = yyextra->protection = Protection::Public ;
+                                          initMethodProtection(yyscanner,Protection::Public);
                                           yyextra->current->mtype = yyextra->mtype = MethodTypes::Slot;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner);
                                         }
 
 <FindMembers>{B}*"protected"{BN}*("slots"|"Q_SLOTS"){BN}*":"{BN}* {
-                                          yyextra->current->protection = yyextra->protection = Protection::Protected ;
+                                          initMethodProtection(yyscanner,Protection::Protected);
                                           yyextra->current->mtype = yyextra->mtype = MethodTypes::Slot;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner);
                                         }
 
 <FindMembers>{B}*"private"{BN}*("slots"|"Q_SLOTS"){BN}*":"{BN}* {
-                                          yyextra->current->protection = yyextra->protection = Protection::Private ;
+                                          initMethodProtection(yyscanner,Protection::Private);
                                           yyextra->current->mtype = yyextra->mtype = MethodTypes::Slot;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner);
                                         }
 <FindMembers>{B}*("public"|"methods"|"__published"){BN}*":"{BN}* {
-                                          yyextra->current->protection = yyextra->protection = Protection::Public ;
-                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+                                          initMethodProtection(yyscanner,Protection::Public);
                                         }
 <FindMembers>{B}*"internal"{BN}*":"{BN}* {  // for now treat C++/CLI's internal as package...
                                           if (yyextra->insideCli)
                                           {
-                                            yyextra->current->protection = yyextra->protection = Protection::Package ;
-                                            yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                            yyextra->current->type.resize(0);
-                                            yyextra->current->name.resize(0);
-                                            yyextra->current->args.resize(0);
-                                            yyextra->current->argList.clear();
-                                            lineCount(yyscanner) ;
+                                            initMethodProtection(yyscanner,Protection::Package);
                                           }
                                           else
                                           {
@@ -673,22 +641,40 @@ NONLopt [^\n]*
                                           }
                                         }
 <FindMembers>{B}*"protected"{BN}*":"{BN}* {
-                                          yyextra->current->protection = yyextra->protection = Protection::Protected ;
-                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+                                          initMethodProtection(yyscanner,Protection::Protected);
                                         }
 <FindMembers>{B}*"private"{BN}*":"{BN}* {
-                                          yyextra->current->protection = yyextra->protection = Protection::Private ;
-                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+                                          initMethodProtection(yyscanner,Protection::Private);
+                                        }
+<FindMembers>{B}*"public"/({BN}|{CCS}|{CPPC}) {
+                                          if (!yyextra->insideCpp) REJECT;
+                                          initMethodProtection(yyscanner,Protection::Public);
+                                          BEGIN(CppProt);
+                                        }
+<FindMembers>{B}*"protected"/({BN}|{CCS}|{CPPC}) {
+                                          if (!yyextra->insideCpp) REJECT;
+                                          initMethodProtection(yyscanner,Protection::Protected);
+                                          BEGIN(CppProt);
+                                        }
+<FindMembers>{B}*"private"/({BN}|{CCS}|{CPPC}) {
+                                          if (!yyextra->insideCpp) REJECT;
+                                          initMethodProtection(yyscanner,Protection::Private);
+                                          BEGIN(CppProt);
+                                        }
+<CppProt>":"                            {
+                                          BEGIN(FindMembers);
+                                        }
+<CppProt>.                              {
+                                          unput(*yytext);
+                                          BEGIN(FindMembers);
+                                        }
+<CppProt>{BN}+                          { lineCount(yyscanner); }
+<CppProt>{CPPC}.*\n                     { lineCount(yyscanner); }
+<CppProt>{CCS}                          { yyextra->lastCContext = YY_START ;
+                                          BEGIN( SkipComment ) ;
+                                        }
+<CppProt>("slots"|"Q_SLOTS")            {
+                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Slot;
                                         }
 <FindMembers>{B}*"event"{BN}+           {
                                           if (yyextra->insideCli)
@@ -776,31 +762,13 @@ NONLopt [^\n]*
                                         }
   */
 <FindMembers>{B}*"@private"{BN}+        {
-                                          yyextra->current->protection = yyextra->protection = Protection::Private ;
-                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+                                          initMethodProtection(yyscanner,Protection::Private);
                                         }
 <FindMembers>{B}*"@protected"{BN}+      {
-                                          yyextra->current->protection = yyextra->protection = Protection::Protected ;
-                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+                                          initMethodProtection(yyscanner,Protection::Protected);
                                         }
-<FindMembers>{B}*"@public"{BN}+ {
-                                          yyextra->current->protection = yyextra->protection = Protection::Public ;
-                                          yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                          yyextra->current->type.resize(0);
-                                          yyextra->current->name.resize(0);
-                                          yyextra->current->args.resize(0);
-                                          yyextra->current->argList.clear();
-                                          lineCount(yyscanner) ;
+<FindMembers>{B}*"@public"{BN}+         {
+                                          initMethodProtection(yyscanner,Protection::Public);
                                         }
 <FindMembers>[\-+]{BN}*                 {
                                           if (!yyextra->insideObjC)
@@ -809,23 +777,18 @@ NONLopt [^\n]*
                                           }
                                           else
                                           {
-                                            lineCount(yyscanner);
                                             yyextra->current->fileName  = yyextra->fileName;
                                             yyextra->current->startLine = yyextra->yyLineNr;
                                             yyextra->current->startColumn = yyextra->yyColNr;
                                             yyextra->current->bodyLine  = yyextra->yyLineNr;
                                             yyextra->current->bodyColumn = yyextra->yyColNr;
                                             yyextra->current->section = Entry::FUNCTION_SEC;
-                                            yyextra->current->protection = yyextra->protection = Protection::Public ;
                                             yyextra->language = yyextra->current->lang = SrcLangExt_ObjC;
                                             yyextra->insideObjC = TRUE;
                                             yyextra->current->virt = Specifier::Virtual;
+
                                             yyextra->current->isStatic=yytext[0]=='+';
-                                            yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
-                                            yyextra->current->type.resize(0);
-                                            yyextra->current->name.resize(0);
-                                            yyextra->current->args.resize(0);
-                                            yyextra->current->argList.clear();
+                                            initMethodProtection(yyscanner,Protection::Public);
                                             BEGIN( ObjCMethod );
                                           }
                                         }
@@ -1106,7 +1069,127 @@ NONLopt [^\n]*
                                           yyextra->curlyCount=0;
                                           BEGIN( ReadNSBody );
                                         }
-<FindMembers>{B}*"initonly"{BN}+        { if (yyextra->insideJava) REJECT;
+<FindMembers>{B}*"export"{BN}+"module"{BN}+ { // primary module interface unit
+                                          if (!yyextra->insideCpp) REJECT;
+                                          //printf("Interface module unit\n");
+                                          yyextra->current->exported = true;
+                                          lineCount(yyscanner);
+                                          BEGIN( ModuleName );
+                                        }
+<FindMembers>{B}*"module"{BN}*";"       { // global module section
+                                          if (!yyextra->insideCpp) REJECT;
+                                          //printf("Implementation module unit\n");
+                                          lineCount(yyscanner);
+                                          BEGIN( FindMembers );
+                                        }
+<FindMembers>{B}*"module"{BN}+          { // module implementation unit
+                                          if (!yyextra->insideCpp) REJECT;
+                                          //printf("Implementation module unit\n");
+                                          yyextra->current->exported = false;
+                                          lineCount(yyscanner);
+                                          BEGIN( ModuleName );
+                                        }
+<FindMembers>{B}*"export"{BN}+"import"{BN}+  { // export an imported module
+                                          yyextra->current->exported = true;
+                                          lineCount(yyscanner);
+                                          BEGIN( ModuleImport );
+                                        }
+<FindMembers>{B}*"import"{BN}+          { // start of a module import
+                                          lineCount(yyscanner);
+                                          BEGIN( ModuleImport );
+                                        }
+<ModuleName>{MODULE_ID}{BN}*":"{BN}*{MODULE_ID} { // module partition name, e.g. A.B:C.D'
+                                          QCString name = yytext;
+                                          int i = name.find(':');
+                                          QCString partition = name.mid(i+1).stripWhiteSpace();
+                                          name = name.left(i).stripWhiteSpace();
+                                          ModuleManager::instance().createModuleDef(yyextra->fileName,
+                                                                                    yyextra->yyLineNr,
+                                                                                    yyextra->yyColNr,
+                                                                                    yyextra->current->exported,
+                                                                                    name,
+                                                                                    partition);
+                                          yyextra->current->section = Entry::MODULEDOC_SEC;
+                                          yyextra->isTypedef=FALSE;
+                                          addType(yyscanner);
+                                          yyextra->current->type += " module";
+                                          yyextra->current->fileName  = yyextra->fileName;
+                                          yyextra->current->startLine = yyextra->yyLineNr;
+                                          yyextra->current->startColumn = yyextra->yyColNr;
+                                          yyextra->current->bodyLine  = yyextra->yyLineNr;
+                                          yyextra->current->bodyColumn = yyextra->yyColNr;
+                                          yyextra->current->name = name+":"+partition;
+                                          lineCount(yyscanner);
+                                        }
+<ModuleName>{MODULE_ID}                 { // primary module name, e.g. A.B
+                                          ModuleManager::instance().createModuleDef(yyextra->fileName,
+                                                                                    yyextra->yyLineNr,
+                                                                                    yyextra->yyColNr,
+                                                                                    yyextra->current->exported,
+                                                                                    yytext);
+                                          yyextra->current->section = Entry::MODULEDOC_SEC;
+                                          yyextra->isTypedef=FALSE;
+                                          addType(yyscanner);
+                                          yyextra->current->type += " module";
+                                          yyextra->current->fileName  = yyextra->fileName;
+                                          yyextra->current->startLine = yyextra->yyLineNr;
+                                          yyextra->current->startColumn = yyextra->yyColNr;
+                                          yyextra->current->bodyLine  = yyextra->yyLineNr;
+                                          yyextra->current->bodyColumn = yyextra->yyColNr;
+                                          yyextra->current->name = yytext;
+                                          lineCount(yyscanner);
+                                        }
+<ModuleName>":"{BN}+"private"           { // start of private section of the module interface
+                                          yyextra->current->exported = yyextra->exported = false;
+                                          lineCount(yyscanner);
+                                        }
+<ModuleName>";"                         { unput(';');
+                                          BEGIN(FindMembers);
+                                        }
+<ModuleName>\n                          { lineCount(yyscanner); }
+<ModuleName>.                           {}
+<ModuleImport>"\""[^"\n]*"\""           { // local header import
+                                          ModuleManager::instance().addHeader(yyextra->fileName,
+                                                                              yyextra->yyLineNr,
+                                                                              QCString(yytext).mid(1,yyleng-2),
+                                                                              false);
+                                        }
+<ModuleImport>"<"[^>\n]*">"             { // system header import
+                                          ModuleManager::instance().addHeader(yyextra->fileName,
+                                                                              yyextra->yyLineNr,
+                                                                              QCString(yytext).mid(1,yyleng-2),
+                                                                              true);
+                                        }
+<ModuleImport>{MODULE_ID}?{BN}*":"{BN}*{MODULE_ID} { // module partition import
+                                          QCString name = yytext; // can be 'M:P' or ':P'
+                                          int i = name.find(':');
+                                          QCString partition = name.mid(i+1).stripWhiteSpace();
+                                          name = name.left(i).stripWhiteSpace();
+                                          ModuleManager::instance().addImport(yyextra->fileName,
+                                                                              yyextra->yyLineNr,
+                                                                              name,
+                                                                              yyextra->current->exported,
+                                                                              partition);
+                                          lineCount(yyscanner);
+                                        }
+<ModuleImport>{MODULE_ID}               { // module import
+                                          ModuleManager::instance().addImport(yyextra->fileName,
+                                                                              yyextra->yyLineNr,
+                                                                              yytext,
+                                                                              yyextra->current->exported);
+                                          lineCount(yyscanner);
+                                        }
+<ModuleImport>";"                       { BEGIN(FindMembers); }
+<ModuleImport>\n                        { lineCount(yyscanner); }
+<ModuleImport>.                         {}
+<FindMembers>{B}*"export"{BN}+"{"       {
+                                          yyextra->current->exported = yyextra->exported = true; // export block
+                                        }
+<FindMembers>{B}*"export"{BN}+          {
+                                          if (!yyextra->insideCpp) REJECT;
+                                          yyextra->current->exported=true;
+                                        }
+<FindMembers>{B}*"initonly"{BN}+        { if (yyextra->insideJava || yyextra->insideCpp) REJECT;
                                           yyextra->current->type += " initonly ";
                                           if (yyextra->insideCli) yyextra->current->spec |= Entry::Initonly;
                                           lineCount(yyscanner);
@@ -1158,9 +1241,24 @@ NONLopt [^\n]*
                                             REJECT;
                                           }
                                         }
-<FindMembers>{B}*"abstract"{BN}+        {
-                                          if (!yyextra->insidePHP)
+<FindMembers>{B}*"sealed"{BN}+          {
+                                          if (yyextra->insideCS)
                                           {
+                                            yyextra->current->spec|=Entry::Sealed;
+                                          }
+                                          else
+                                          {
+                                            REJECT;
+                                          }
+                                        }
+<FindMembers>{B}*"abstract"{BN}+        {
+                                          if (yyextra->insidePHP || yyextra->insideCS)
+                                          {
+                                            yyextra->current->spec|=Entry::Abstract;
+                                          }
+                                          else
+                                          {
+                                            if (yyextra->insideCpp) REJECT;
                                             yyextra->current->type += " abstract ";
                                             if (!yyextra->insideJava)
                                             {
@@ -1170,10 +1268,6 @@ NONLopt [^\n]*
                                             {
                                               yyextra->current->spec|=Entry::Abstract;
                                             }
-                                          }
-                                          else
-                                          {
-                                            yyextra->current->spec|=Entry::Abstract;
                                           }
                                           lineCount(yyscanner);
                                         }
@@ -1189,7 +1283,7 @@ NONLopt [^\n]*
                                           yyextra->current->spec|=Entry::Explicit;
                                           lineCount(yyscanner);
                                         }
-<FindMembers>{B}*"local"{BN}+           { if (yyextra->insideJava) REJECT;
+<FindMembers>{B}*"local"{BN}+           { if (yyextra->insideJava || yyextra->insideCpp) REJECT;
                                           yyextra->current->spec|=Entry::Local;
                                           lineCount(yyscanner);
                                         }
@@ -1723,7 +1817,12 @@ NONLopt [^\n]*
                                           lineCount(yyscanner);
                                           yyextra->current->name += *yytext ;
                                         }
-<Operator>"<"({B}*{ID}{B}*(","{B}*{BN})*{B}*)?">" { /* skip guided templ specifiers */ }
+<Operator>"<"({B}*{ID}{B}*(","{B}*{BN})*{B}*)?">" { /* skip guided templ specifiers */ 
+                                          if (!yyextra->current->type.startsWith("friend "))
+                                          {
+                                            yyextra->current->name += yytext;
+                                          }
+                                        }
 <Operator>"("                           {
                                           yyextra->current->name = yyextra->current->name.simplifyWhiteSpace();
                                           unput(*yytext);
@@ -1935,12 +2034,13 @@ NONLopt [^\n]*
                                           yyextra->current->name=n.left(n.length()-2);
                                         }
 <FindMembers>{SCOPENAME}{BNopt}/"<"     { // Note: this could be a return type!
+                                          QCString name = QCString(yytext).stripWhiteSpace();
+                                          if (yyextra->insideCpp && name=="import") REJECT; // C++20 module header import
                                           yyextra->roundCount=0;
                                           yyextra->sharpCount=0;
                                           lineCount(yyscanner);
                                           addType(yyscanner);
-                                          yyextra->current->name=yytext;
-                                          yyextra->current->name=yyextra->current->name.stripWhiteSpace();
+                                          yyextra->current->name=name;
                                           //yyextra->current->scopeSpec.resize(0);
                                           // yyextra->currentTemplateSpec = &yyextra->current->scopeSpec;
                                           if (nameIsOperator(yyextra->current->name))
@@ -2109,6 +2209,8 @@ NONLopt [^\n]*
 <FindMembers>"Q_OBJECT"|"Q_GADGET"      { // Qt object / gadget macro
                                         }
 <FindMembers>"Q_PROPERTY"               { // Qt property declaration
+                                          yyextra->yyBegLineNr = yyextra->yyLineNr;
+                                          yyextra->yyBegColNr  = yyextra->yyColNr;
                                           yyextra->current->protection = Protection::Public ; // see bug734245 & bug735462
                                           yyextra->current->mtype = yyextra->mtype = MethodTypes::Property;
                                           yyextra->current->type.resize(0);
@@ -2610,7 +2712,7 @@ NONLopt [^\n]*
                                           yyextra->current->name = yytext;
                                           BEGIN(DefineEnd);
                                         }
-<DefineEnd>\n                           {
+<DefineEnd>({BN}*{B}*"/*#end#*/")?\n    {
                                           //printf("End define: doc=%s docFile=%s docLine=%d\n",qPrint(yyextra->current->doc),qPrint(yyextra->current->docFile),yyextra->current->docLine);
                                           yyextra->current->fileName   = yyextra->fileName;
                                           yyextra->current->startLine  = yyextra->yyLineNr;
@@ -2619,8 +2721,14 @@ NONLopt [^\n]*
                                           yyextra->current->args       = yyextra->current->args.simplifyWhiteSpace();
                                           yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
                                           yyextra->current->section    = Entry::DEFINE_SEC;
-                                          yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
                                           lineCount(yyscanner);
+                                          if (yyleng>1) // multiline define
+                                          {
+                                            yyextra->current->endBodyLine = yyextra->yyLineNr-1;
+                                            //printf("found multiline define %s body=[%d..%d]\n",
+                                            //    qPrint(yyextra->current->name),yyextra->current->bodyLine,yyextra->current->endBodyLine);
+                                          }
+                                          yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
                                           initEntry(yyscanner);
                                           BEGIN(yyextra->lastDefineContext);
                                         }
@@ -3004,6 +3112,10 @@ NONLopt [^\n]*
                                         }
 <ReadInitializer,ReadInitializerPtr>[>\]})]             {
                                           yyextra->initBracketCount--;
+                                          if (*yytext=='}')
+                                          {
+                                            yyextra->current->endBodyLine=yyextra->yyLineNr;
+                                          }
                                           yyextra->current->initializer << *yytext;
                                         }
 <ReadInitializer,ReadInitializerPtr>\'                  {
@@ -3432,7 +3544,10 @@ NONLopt [^\n]*
 <GCopyCurly>"}"                         {
                                           *yyextra->pCopyCurlyGString << *yytext;
                                           if (--yyextra->curlyCount<0)
+                                          {
+                                            yyextra->current->endBodyLine = yyextra->yyLineNr;
                                             BEGIN(yyextra->lastCurlyContext);
+                                          }
                                         }
 <GCopyCurly>{CHARLIT}                    { if (yyextra->insidePHP)
                                           {
@@ -3509,7 +3624,13 @@ NONLopt [^\n]*
                                           bool isStatic = yyextra->current->isStatic;
                                           Protection prot = yyextra->current->protection;
                                           bool isConcept = yyextra->current->section==Entry::CONCEPT_SEC;
+                                          bool isModule  = yyextra->current->section==Entry::MODULEDOC_SEC;
                                           if (isConcept) // C++20 concept
+                                          {
+                                            yyextra->current_root->moveToSubEntryAndRefresh( yyextra->current ) ;
+                                            initEntry(yyscanner);
+                                          }
+                                          else if (isModule) // C++20 module
                                           {
                                             yyextra->current_root->moveToSubEntryAndRefresh( yyextra->current ) ;
                                             initEntry(yyscanner);
@@ -4008,7 +4129,7 @@ NONLopt [^\n]*
                                           yyextra->current->program << yytext ;
                                           --yyextra->curlyCount ;
                                         }
-<ReadBody,ReadNSBody>"}"                { //err("ReadBody count=%d\n",yyextra->curlyCount);
+<ReadBody,ReadNSBody>"}"                { //err("%d:ReadBody count=%d\n",yyextra->yyLineNr,yyextra->curlyCount);
                                           if ( yyextra->curlyCount>0 )
                                           {
                                             yyextra->current->program << yytext ;
@@ -4757,7 +4878,7 @@ NONLopt [^\n]*
                                         }
 <CopyArgVerbatim>[\\@]("f$"|"f]"|"f}"|"f)") { // end of verbatim block
                                           yyextra->fullArgString+=yytext;
-					  if (yyextra->docBlockName==&yytext[1])
+                                          if (yyextra->docBlockName==&yytext[1])
                                           {
                                             yyextra->docBlockName="";
                                             BEGIN(CopyArgCommentLine);
@@ -4906,8 +5027,8 @@ NONLopt [^\n]*
   */
 <FuncQual>[{:;,]                        {
                                           if ( qstrcmp(yytext,";")==0 &&
-                                               yyextra->insidePHP &&
-                                               !containsWord(yyextra->current->type,"function") )
+                                               ((yyextra->insideJS || yyextra->insidePHP) &&
+                                                !containsWord(yyextra->current->type,"function")) )
                                           {
                                             yyextra->current->reset();
                                             initEntry(yyscanner);
@@ -5248,9 +5369,6 @@ NONLopt [^\n]*
 
                                           if (*yytext!=';' || (yyextra->current_root->section&Entry::COMPOUND_MASK) )
                                           {
-                                            int tempArg=yyextra->current->name.find('<');
-                                            QCString tempName;
-                                            if (tempArg==-1) tempName=yyextra->current->name; else tempName=yyextra->current->name.left(tempArg);
                                             if (isVariable)
                                             {
                                               //printf("Scanner.l: found in class variable: '%s' '%s' '%s'\n", qPrint(yyextra->current->type),qPrint(yyextra->current->name),qPrint(yyextra->current->args));
@@ -6989,7 +7107,7 @@ NONLopt [^\n]*
 <DocCopyBlock><<EOF>>                   {
                                           warn(yyextra->fileName,yyextra->yyLineNr,
                                               "reached end of file while inside a '%s' block!\n"
-                                              "The command that should end the block seems to be missing!\n",
+                                              "The command that should end the block seems to be missing!",
                                               qPrint(yyextra->docBlockName));
                                           yyterminate();
                                         }
@@ -7152,6 +7270,7 @@ NONLopt [^\n]*
                                             }
                                           }
                                         }
+<*>"}"                                  { yyextra->exported=false; }
 <*>.
 <SkipComment>{CPPC}|{CCS}
 <*>{CCS}                                 { yyextra->lastCContext = YY_START ;
@@ -7223,6 +7342,7 @@ static void initEntry(yyscan_t yyscanner)
     yyextra->protection = (yyextra->current_root->spec & (Entry::Interface|Entry::Enum)) ?  Protection::Public : Protection::Package;
   }
   yyextra->current->protection = yyextra->protection ;
+  yyextra->current->exported   = yyextra->exported ;
   yyextra->current->mtype      = yyextra->mtype;
   yyextra->current->virt       = yyextra->virt;
   yyextra->current->isStatic   = yyextra->isStatic;
@@ -7271,6 +7391,17 @@ static inline int computeIndent(const char *s,int startIndent)
     else col++;
   }
   return col;
+}
+static inline void initMethodProtection(yyscan_t yyscanner,Protection prot)
+{
+  struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
+  yyextra->current->protection = yyextra->protection = prot;
+  yyextra->current->mtype = yyextra->mtype = MethodTypes::Method;
+  yyextra->current->type.resize(0);
+  yyextra->current->name.resize(0);
+  yyextra->current->args.resize(0);
+  yyextra->current->argList.clear();
+  lineCount(yyscanner) ;
 }
 
 static void addType(yyscan_t yyscanner)
@@ -7753,10 +7884,16 @@ static void parseCompounds(yyscan_t yyscanner,const std::shared_ptr<Entry> &rt)
           yyextra->current->isStatic = yyextra->isStatic = TRUE;
         }
         yyextra->current->protection = yyextra->protection = ce->protection;
+        yyextra->current->exported = yyextra->exported = false;
+      }
+      else if (ce->section==Entry::NAMESPACE_SEC )
+      {
+        yyextra->current->exported = yyextra->exported = ce->exported;
       }
       else // named struct, union, protocol, category
       {
         yyextra->current->protection = yyextra->protection = Protection::Public ;
+        yyextra->current->exported = yyextra->exported = false;
       }
       yyextra->mtype = MethodTypes::Method;
       yyextra->virt = Specifier::Normal;
@@ -7808,6 +7945,7 @@ static void parseMain(yyscan_t yyscanner,
   yyextra->protection    = Protection::Public;
   yyextra->mtype         = MethodTypes::Method;
   yyextra->isStatic      = FALSE;
+  yyextra->exported      = false;
   yyextra->virt          = Specifier::Normal;
   yyextra->current_root  = rt;
   yyextra->yyLineNr      = 1 ;

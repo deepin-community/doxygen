@@ -39,6 +39,16 @@
 #include "indexlist.h"
 #include "trace.h"
 
+#if !ENABLE_DOCPARSER_TRACING
+#undef  AUTO_TRACE
+#undef  AUTO_TRACE_ADD
+#undef  AUTO_TRACE_EXIT
+#define AUTO_TRACE(...)      (void)0
+#define AUTO_TRACE_ADD(...)  (void)0
+#define AUTO_TRACE_EXIT(...) (void)0
+#endif
+
+
 //---------------------------------------------------------------------------
 
 IDocParserPtr createDocParser()
@@ -462,23 +472,20 @@ bool DocParser::findDocsForMemberOrCompound(const QCString &commandName,
   QCString name=removeRedundantWhiteSpace(cmdArg.left(funcStart));
   QCString args=cmdArg.right(l-funcStart);
   // try if the link is to a member
-  const MemberDef    *md=0;
-  const ClassDef     *cd=0;
-  const NamespaceDef *nd=0;
-  bool found = getDefs(
-      context.context.find('.')==-1?context.context:QCString(), // find('.') is a hack to detect files
+  GetDefInput input(
+      context.context.find('.')==-1 ? context.context : QCString(), // find('.') is a hack to detect files
       name,
-      args.isEmpty() ? QCString() : args,
-      md,cd,fd,nd,gd,FALSE,0,TRUE);
+      args.isEmpty() ? QCString() : args);
+  input.checkCV=true;
+  GetDefResult result = getDefs(input);
   //printf("found=%d context=%s name=%s\n",found,qPrint(context.context),qPrint(name));
-  if (found && md)
+  if (result.found && result.md)
   {
-    *pDoc=md->documentation();
-    *pBrief=md->briefDescription();
-    *pDef=md;
+    *pDoc=result.md->documentation();
+    *pBrief=result.md->briefDescription();
+    *pDef=result.md;
     return TRUE;
   }
-
 
   int scopeOffset=static_cast<int>(context.context.length());
   do // for each scope
@@ -491,7 +498,7 @@ bool DocParser::findDocsForMemberOrCompound(const QCString &commandName,
     //printf("Trying fullName='%s'\n",qPrint(fullName));
 
     // try class, namespace, group, page, file reference
-    cd = Doxygen::classLinkedMap->find(fullName);
+    const ClassDef *cd = Doxygen::classLinkedMap->find(fullName);
     if (cd) // class
     {
       *pDoc=cd->documentation();
@@ -499,7 +506,7 @@ bool DocParser::findDocsForMemberOrCompound(const QCString &commandName,
       *pDef=cd;
       return TRUE;
     }
-    nd = Doxygen::namespaceLinkedMap->find(fullName);
+    const NamespaceDef *nd = Doxygen::namespaceLinkedMap->find(fullName);
     if (nd) // namespace
     {
       *pDoc=nd->documentation();
@@ -1039,7 +1046,7 @@ void DocParser::handleImage(DocNodeVariant *parent, DocNodeList &children)
       if (context.token->name == "{")
       {
         tokenizer.setStateOptions();
-        tok=tokenizer.lex();
+        tokenizer.lex();
         tokenizer.setStatePara();
         StringVector optList=split(context.token->name.str(),",");
         for (const auto &opt : optList)
@@ -1350,10 +1357,10 @@ reparsetoken:
         switch (Mappers::htmlTagMapper->map(tokenName))
         {
           case HTML_DIV:
-            warn_doc_error(context.fileName,tokenizer.getLineNr(),"found <div> tag in heading\n");
+            warn_doc_error(context.fileName,tokenizer.getLineNr(),"found <div> tag in heading");
             break;
           case HTML_PRE:
-            warn_doc_error(context.fileName,tokenizer.getLineNr(),"found <pre> tag in heading\n");
+            warn_doc_error(context.fileName,tokenizer.getLineNr(),"found <pre> tag in heading");
             break;
           case HTML_BOLD:
             if (!context.token->endTag)
@@ -1576,7 +1583,7 @@ void DocParser::handleImg(DocNodeVariant *parent, DocNodeList &children,const Ht
   }
   if (!found)
   {
-    warn_doc_error(context.fileName,tokenizer.getLineNr(),"IMG tag does not have a SRC attribute!\n");
+    warn_doc_error(context.fileName,tokenizer.getLineNr(),"IMG tag does not have a SRC attribute!");
   }
 }
 
@@ -1670,7 +1677,7 @@ void DocParser::readTextFileByName(const QCString &file,QCString &text)
 
 //---------------------------------------------------------------------------
 
-static QCString extractCopyDocId(const char *data, uint32_t &j, uint32_t len)
+static QCString extractCopyDocId(const char *data, uint32_t &j, size_t len)
 {
   uint32_t s=j;
   int round=0;
@@ -1733,7 +1740,7 @@ static QCString extractCopyDocId(const char *data, uint32_t &j, uint32_t len)
    do if ((i+sizeof(str)<len) && qstrncmp(data+i+1,str,sizeof(str)-1)==0) \
    { j=i+sizeof(str); action; } while(0)
 
-static uint32_t isCopyBriefOrDetailsCmd(const char *data, uint32_t i,uint32_t len,bool &brief)
+static uint32_t isCopyBriefOrDetailsCmd(const char *data, uint32_t i,size_t len,bool &brief)
 {
   uint32_t j=0;
   if (i==0 || (data[i-1]!='@' && data[i-1]!='\\')) // not an escaped command
@@ -1744,7 +1751,7 @@ static uint32_t isCopyBriefOrDetailsCmd(const char *data, uint32_t i,uint32_t le
   return j;
 }
 
-static uint32_t isVerbatimSection(const char *data,uint32_t i,uint32_t len,QCString &endMarker)
+static uint32_t isVerbatimSection(const char *data,uint32_t i,size_t len,QCString &endMarker)
 {
   uint32_t j=0;
   if (i==0 || (data[i-1]!='@' && data[i-1]!='\\')) // not an escaped command
@@ -1768,7 +1775,7 @@ static uint32_t isVerbatimSection(const char *data,uint32_t i,uint32_t len,QCStr
   return j;
 }
 
-static uint32_t skipToEndMarker(const char *data,uint32_t i,uint32_t len,const QCString &endMarker)
+static uint32_t skipToEndMarker(const char *data,uint32_t i,size_t len,const QCString &endMarker)
 {
   while (i<len)
   {
@@ -1783,7 +1790,7 @@ static uint32_t skipToEndMarker(const char *data,uint32_t i,uint32_t len,const Q
     i++;
   }
   // oops no endmarker found...
-  return i<len ? i+1 : len;
+  return i<len ? i+1 : static_cast<uint32_t>(len);
 }
 
 
@@ -1847,7 +1854,7 @@ QCString DocParser::processCopyDoc(const char *data,size_t &len)
           else
           {
             warn_doc_error(context.fileName,tokenizer.getLineNr(),
-	         "Found recursive @copy%s or @copydoc relation for argument '%s'.\n",
+	         "Found recursive @copy%s or @copydoc relation for argument '%s'.",
                  isBrief?"brief":"details",qPrint(id));
           }
         }

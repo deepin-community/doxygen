@@ -52,6 +52,15 @@
 #include "trace.h"
 #include "anchor.h"
 
+#if !ENABLE_MARKDOWN_TRACING
+#undef  AUTO_TRACE
+#undef  AUTO_TRACE_ADD
+#undef  AUTO_TRACE_EXIT
+#define AUTO_TRACE(...)      (void)0
+#define AUTO_TRACE_ADD(...)  (void)0
+#define AUTO_TRACE_EXIT(...) (void)0
+#endif
+
 enum class ExplicitPageResult
 {
   explicitPage,      /**< docs start with a page command */
@@ -1490,7 +1499,7 @@ int Markdown::processLink(const char *data,int offset,int size)
   return i;
 }
 
-/** '`' parsing a code span (assuming codespan != 0) */
+/** `` ` `` parsing a code span (assuming codespan != 0) */
 int Markdown::processCodeSpan(const char *data, int /*offset*/, int size)
 {
   AUTO_TRACE("data='{}' size={}",Trace::trunc(data),size);
@@ -3403,10 +3412,14 @@ void MarkdownOutlineParser::parseInput(const QCString &fileName,
       }
       else
       {
-        if (title.isEmpty()) {title = titleFn;prepend=0;}
+        if (title.isEmpty())
+        {
+          title = titleFn;
+          prepend = 0;
+        }
         if (!wasEmpty)
         {
-          docs.prepend("@ianchor{" + title + "} " +  markdownFileNameToId(fileName) + "\\ilinebr ");
+          docs.prepend("@ianchor{" + title + "} " + id + "\\ilinebr ");
         }
         else if (!generatedId.isEmpty())
         {

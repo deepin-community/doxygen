@@ -13,6 +13,8 @@ export DH_OPTIONS=
 CFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CFLAGS)
 CXXFLAGS := $(shell dpkg-buildflags --get CPPFLAGS; dpkg-buildflags --get CXXFLAGS)
 LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
+CFLAGS   += -D_LARGE_FILE_SOURCE=1  -D_FILE_OFFSET_BITS=64
+CXXFLAGS += -D_LARGE_FILE_SOURCE=1  -D_FILE_OFFSET_BITS=64
 export CFLAGS
 export CXXFLAGS
 export LDFLAGS
@@ -31,12 +33,11 @@ CONFIGUREFLAGS += -DPYTHON_EXECUTABLE=/usr/bin/python3
 CONFIGUREFLAGS += -Duse_libclang=$(if $(filter $(DEB_HOST_ARCH),$(clang_archs)),ON,OFF)
 CONFIGUREFLAGS += -Dbuild_search=ON
 CONFIGUREFLAGS += -Dbuild_parse=ON
-# still experimental according to upstream
-#CONFIGUREFLAGS += -Duse_sqlite3=ON
+CONFIGUREFLAGS += -Duse_sys_spdlog=ON
 
 configure-stamp:
 	dh_testdir
-	$(MAKE) -C deps/jquery/ install
+	$(MAKE) -C deps/jquery install
 	rm -rf build
 	mkdir -p build
 	cd build && cmake -G "Unix Makefiles" $(CONFIGUREFLAGS) $(CURDIR)

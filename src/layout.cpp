@@ -188,7 +188,7 @@ class LayoutParser
     }
     void error( const std::string &fileName,int lineNr,const std::string &msg)
     {
-      ::warn(fileName.c_str(),lineNr,"%s",msg.c_str());
+      warn(fileName.c_str(),lineNr,"%s",msg.c_str());
     }
     void startElement( const std::string &name, const XMLHandlers::Attributes& attrib );
     void endElement( const std::string &name );
@@ -304,12 +304,33 @@ class LayoutParser
           theTranslator->trRelatedPagesDescription(),
           "pages"
         },
+        { "topics",
+          LayoutNavEntry::Topics,
+          theTranslator->trTopics(),
+          QCString(),
+          theTranslator->trTopicListDescription(),
+          "topics"
+        },
         { "modules",
           LayoutNavEntry::Modules,
           theTranslator->trModules(),
-          QCString(),
+          theTranslator->trModulesList(),
           theTranslator->trModulesDescription(),
           "modules"
+        },
+        { "modulelist",
+          LayoutNavEntry::ModuleList,
+          theTranslator->trModulesList(),
+          QCString(),
+          theTranslator->trModulesListDescription(extractAll),
+          "modules"
+        },
+        { "modulemembers",
+          LayoutNavEntry::ModuleMembers,
+          theTranslator->trModulesMembers(),
+          QCString(),
+          theTranslator->trModulesMemberDescription(extractAll),
+          "modulemembers"
         },
         { "namespaces",
           LayoutNavEntry::Namespaces,
@@ -515,11 +536,11 @@ class LayoutParser
         std::string fileName = m_locator->fileName();
         if (type.isEmpty())
         {
-          ::warn(fileName.c_str(),m_locator->lineNr(),"an entry tag within a navindex has no type attribute! Check your layout file!\n");
+          warn(fileName.c_str(),m_locator->lineNr(),"an entry tag within a navindex has no type attribute! Check your layout file!");
         }
         else
         {
-          ::warn(fileName.c_str(),m_locator->lineNr(),"the type '%s' is not supported for the entry tag within a navindex! Check your layout file!\n",qPrint(type));
+          warn(fileName.c_str(),m_locator->lineNr(),"the type '%s' is not supported for the entry tag within a navindex! Check your layout file!",qPrint(type));
         }
         m_invalidEntry=TRUE;
         return;
@@ -1127,8 +1148,8 @@ static const std::map< std::string, ElementCallbacks > g_elementHandlers =
                                                   } },
   { "group/authorsection",                        { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::AuthorSection) } },
   { "group/groupgraph",                           { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::GroupGraph)    } },
-  { "group/memberdecl/membergroups",              { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::MemberGroups)  } },
   { "group/memberdecl",                           { startCb(&LayoutParser::startMemberDecl), endCb(&LayoutParser::endMemberDecl) } },
+  { "group/memberdecl/membergroups",              { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::MemberGroups)  } },
   { "group/memberdecl/classes",                   { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::GroupClasses,
                                                             []() { return compileOptions(/* default */       theTranslator->trCompounds(),
                                                                                          SrcLangExt_VHDL,    theTranslator->trVhdlType(VhdlDocGen::ENTITY,FALSE),
@@ -1136,6 +1157,9 @@ static const std::map< std::string, ElementCallbacks > g_elementHandlers =
                                                   } },
   { "group/memberdecl/concepts",                  { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::GroupConcepts,
                                                             []() { return compileOptions(theTranslator->trConcept(true,false)); })
+                                                  } },
+  { "group/memberdecl/modules",                   { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::GroupModules,
+                                                            []() { return compileOptions(theTranslator->trModule(true,false)); })
                                                   } },
   { "group/memberdecl/namespaces",                { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::GroupNamespaces,
                                                             []() { return compileOptions(/* default */       theTranslator->trNamespaces(),
@@ -1251,6 +1275,42 @@ static const std::map< std::string, ElementCallbacks > g_elementHandlers =
                                                             []() { return compileOptions(theTranslator->trFriends()); })
                                                   } },
 
+  // module layout handlers
+  { "module",                                     { startCb(&LayoutParser::startTop,LayoutDocManager::Module,"module/",LayoutNavEntry::Modules),
+                                                    endCb(&LayoutParser::endTop)
+                                                  } },
+  { "module/briefdescription",                    { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::BriefDesc) } },
+  { "module/exportedmodules",                     { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::ModuleExports,
+                                                            []() { return compileOptions(theTranslator->trExportedModules()); })
+                                                  } },
+  { "module/detaileddescription",                 { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::DetailedDesc,
+                                                            []() { return compileOptions(theTranslator->trDetailedDescription()); })
+                                                  } },
+  { "module/authorsection",                       { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::AuthorSection) } },
+  { "module/memberdecl",                          { startCb(&LayoutParser::startMemberDecl), endCb(&LayoutParser::endMemberDecl) } },
+  { "module/memberdecl/concepts",                 { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::ModuleConcepts,
+                                                            []() { return compileOptions(theTranslator->trConcept(true,false)); })
+                                                  } },
+  { "module/memberdecl/classes",                  { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::ModuleClasses,
+                                                            []() { return compileOptions(theTranslator->trCompounds()); })
+                                                  } },
+  { "module/memberdecl/enums",                    { startCb(&LayoutParser::startMemberDeclEntry, MemberListType_decEnumMembers,
+                                                            []() { return compileOptions(theTranslator->trEnumerations()); })
+                                                  } },
+  { "module/memberdecl/typedefs",                 { startCb(&LayoutParser::startMemberDeclEntry, MemberListType_decTypedefMembers,
+                                                            []() { return compileOptions(theTranslator->trTypedefs()); })
+                                                  } },
+  { "module/memberdecl/functions",                { startCb(&LayoutParser::startMemberDeclEntry, MemberListType_decFuncMembers,
+                                                            []() { return compileOptions(theTranslator->trFunctions()); })
+                                                  } },
+  { "module/memberdecl/variables",                { startCb(&LayoutParser::startMemberDeclEntry, MemberListType_decVarMembers,
+                                                            []() { return compileOptions(theTranslator->trVariables()); })
+                                                  } },
+  { "module/memberdecl/membergroups",             { startCb(&LayoutParser::startSimpleEntry, LayoutDocEntry::MemberGroups)  } },
+  { "module/memberdecl/files",                    { startCb(&LayoutParser::startSectionEntry, LayoutDocEntry::ModuleUsedFiles,
+                                                            []() { return compileOptions(theTranslator->trFile(TRUE,FALSE)); })
+                                                  } },
+
   // directory layout handlers
   { "directory",                                  { startCb(&LayoutParser::startTop,LayoutDocManager::Directory,"directory/",LayoutNavEntry::None),
                                                     endCb(&LayoutParser::endTop)
@@ -1278,7 +1338,7 @@ void LayoutParser::startElement( const std::string &name, const XMLHandlers::Att
   else
   {
     std::string fileName = m_locator->fileName();
-    ::warn(fileName.c_str(),m_locator->lineNr(),"Unexpected start tag '%s' found in scope='%s'!\n",
+    warn(fileName.c_str(),m_locator->lineNr(),"Unexpected start tag '%s' found in scope='%s'!",
         qPrint(name),qPrint(m_scope));
   }
 }
@@ -1385,9 +1445,12 @@ void LayoutDocManager::parse(const QCString &fileName, const char *data)
   handlers.error        = [&layoutParser](const std::string &fn,int lineNr,const std::string &msg) { layoutParser.error(fn,lineNr,msg); };
   XMLParser parser(handlers);
   layoutParser.setDocumentLocator(&parser);
-  parser.parse(fileName.data(),data ? data : fileToString(fileName).data(),Debug::isFlagSet(Debug::Lex_xml),
+  parser.parse(fileName.data(),
+               data ? data : fileToString(fileName).data(),
+               Debug::isFlagSet(Debug::Lex_xml),
                [&]() { DebugLex::print(Debug::Lex_xml,"Entering","libxml/xml.l",qPrint(fileName)); },
-               [&]() { DebugLex::print(Debug::Lex_xml,"Finished", "libxml/xml.l",qPrint(fileName)); }
+               [&]() { DebugLex::print(Debug::Lex_xml,"Finished", "libxml/xml.l",qPrint(fileName)); },
+               transcodeCharacterStringToUTF8
               );
 }
 

@@ -67,6 +67,8 @@ static QCString g_mathjax_code;
 static QCString g_latex_macro;
 static constexpr auto hex="0123456789ABCDEF";
 
+static const SelectionMarkerInfo htmlMarkerInfo = { '<', "<!--BEGIN ",10,"<!--END ",8,"-->",3 };
+
 // note: this is only active if DISABLE_INDEX=YES, if DISABLE_INDEX is disabled, this
 // part will be rendered inside menu.js
 static void writeClientSearchBox(TextStream &t,const QCString &relPath)
@@ -167,7 +169,7 @@ static QCString getConvertLatexMacro()
     // check for \newcommand or \renewcommand
     if (data[i] != '\\')
     {
-      warn(macrofile,line, "file contains non valid code, expected '\\' got '%c'\n",data[i]);
+      warn(macrofile,line, "file contains non valid code, expected '\\' got '%c'",data[i]);
       return "";
     }
     i++;
@@ -187,13 +189,13 @@ static QCString getConvertLatexMacro()
     // handle {cmd}
     if (data[i] != '{')
     {
-      warn(macrofile,line, "file contains non valid code, expected '{' got '%c'\n",data[i]);
+      warn(macrofile,line, "file contains non valid code, expected '{' got '%c'",data[i]);
       return "";
     }
     i++;
     if (data[i] != '\\')
     {
-      warn(macrofile,line, "file contains non valid code, expected '\\' got '%c'\n",data[i]);
+      warn(macrofile,line, "file contains non valid code, expected '\\' got '%c'",data[i]);
       return "";
     }
     i++;
@@ -225,14 +227,14 @@ static QCString getConvertLatexMacro()
     }
     else if (data[i] != '{')
     {
-      warn(macrofile,line, "file contains non valid code, expected '[' or '{' got '%c'\n",data[i]);
+      warn(macrofile,line, "file contains non valid code, expected '[' or '{' got '%c'",data[i]);
       return "";
     }
     // handle {replacement}
     // retest as the '[' part might have advanced so we can have a new '{'
     if (data[i] != '{')
     {
-      warn(macrofile,line, "file contains non valid code, expected '{' got '%c'\n",data[i]);
+      warn(macrofile,line, "file contains non valid code, expected '{' got '%c'",data[i]);
       return "";
     }
     out.addChar('"');
@@ -595,8 +597,6 @@ static QCString substituteHtmlKeywords(const QCString &str,
   });
 
   result = substitute(result,"$relpath^",relPath); //<-- must be done after the previous substitutions
-
-  static const SelectionMarkerInfo htmlMarkerInfo = { '<', "<!--BEGIN ",10,"<!--END ",8,"-->",3 };
 
   // remove conditional blocks
   result = selectBlocks(result,
@@ -1046,6 +1046,21 @@ void HtmlCodeGenerator::endCodeFragment(const QCString &)
   *m_t << "</div><!-- fragment -->";
 }
 
+void HtmlCodeGenerator::startFold(int lineNr,const QCString &startMarker,const QCString &endMarker)
+{
+  const int maxLineNrStr = 10;
+  char lineNumber[maxLineNrStr];
+  qsnprintf(lineNumber,maxLineNrStr,"%05d",lineNr);
+  *m_t << "<div class=\"foldopen\" id=\"foldopen" << lineNumber <<
+          "\" data-start=\"" << startMarker <<
+          "\" data-end=\"" << endMarker <<
+          "\">\n";
+}
+
+void HtmlCodeGenerator::endFold()
+{
+  *m_t << "</div>\n";
+}
 
 //--------------------------------------------------------------------------
 
@@ -1125,20 +1140,28 @@ void HtmlGenerator::init()
   {
     g_header=fileToString(Config_getString(HTML_HEADER));
     //printf("g_header='%s'\n",qPrint(g_header));
+    QCString result = substituteHtmlKeywords(g_header,QCString(),QCString());
+    checkBlocks(result,Config_getString(HTML_HEADER),htmlMarkerInfo);
   }
   else
   {
     g_header = ResourceMgr::instance().getAsString("header.html");
+    QCString result = substituteHtmlKeywords(g_header,QCString(),QCString());
+    checkBlocks(result,"<default header.html>",htmlMarkerInfo);
   }
 
   if (!Config_getString(HTML_FOOTER).isEmpty())
   {
     g_footer=fileToString(Config_getString(HTML_FOOTER));
     //printf("g_footer='%s'\n",qPrint(g_footer));
+    QCString result = substituteHtmlKeywords(g_footer,QCString(),QCString());
+    checkBlocks(result,Config_getString(HTML_FOOTER),htmlMarkerInfo);
   }
   else
   {
     g_footer = ResourceMgr::instance().getAsString("footer.html");
+    QCString result = substituteHtmlKeywords(g_footer,QCString(),QCString());
+    checkBlocks(result,"<default footer.html>",htmlMarkerInfo);
   }
 
   if (Config_getBool(USE_MATHJAX))
@@ -1204,10 +1227,10 @@ void HtmlGenerator::init()
     if (f.is_open())
     {
       TextStream t(&f);
-      t << mgr.getAsString("dynsections.js");
+      t << replaceVariables(mgr.getAsString("dynsections.js"));
       if (Config_getBool(SOURCE_BROWSER) && Config_getBool(SOURCE_TOOLTIPS))
       {
-        t << mgr.getAsString("dynsections_tooltips.js");
+        t << replaceVariables(mgr.getAsString("dynsections_tooltips.js"));
       }
     }
   }
@@ -1249,6 +1272,10 @@ void HtmlGenerator::writeTabData()
   mgr.copyResource("sync_off.luma",dname);
   mgr.copyResource("nav_g.png",dname);
   Doxygen::indexList->addImageFile("nav_g.png");
+  mgr.copyResource("plus.svg",dname);
+  mgr.copyResource("minus.svg",dname);
+  mgr.copyResource("plusd.svg",dname);
+  mgr.copyResource("minusd.svg",dname);
 }
 
 void HtmlGenerator::writeSearchData(const QCString &dname)
@@ -1540,7 +1567,7 @@ void HtmlGenerator::writeStyleInfo(int part)
         FileInfo cssfi(cssName.str());
         if (!cssfi.exists() || !cssfi.isFile() || !cssfi.isReadable())
         {
-          err("style sheet %s does not exist or is not readable!", qPrint(Config_getString(HTML_STYLESHEET)));
+          err("style sheet %s does not exist or is not readable!\n", qPrint(Config_getString(HTML_STYLESHEET)));
         }
         else
         {
@@ -1973,7 +2000,12 @@ void HtmlGenerator::startMemberItem(const QCString &anchor,MemberItemType type,c
   {
     m_t << " inherit " << inheritId;
   }
-  m_t << "\">";
+  m_t << "\"";
+  if (!anchor.isEmpty())
+  {
+    m_t << " id=\"r_" << anchor << "\"";
+  }
+  m_t << ">";
   insertMemberAlignLeft(type, true);
 }
 
@@ -2584,25 +2616,29 @@ static bool quickLinkVisible(LayoutNavEntry::Kind kind)
 {
   const auto &index = Index::instance();
   bool showNamespaces = Config_getBool(SHOW_NAMESPACES);
+  bool showFiles = Config_getBool(SHOW_FILES);
   switch (kind)
   {
     case LayoutNavEntry::MainPage:           return TRUE;
     case LayoutNavEntry::User:               return TRUE;
     case LayoutNavEntry::UserGroup:          return TRUE;
     case LayoutNavEntry::Pages:              return index.numIndexedPages()>0;
-    case LayoutNavEntry::Modules:            return index.numDocumentedGroups()>0;
-    case LayoutNavEntry::Namespaces:         return index.numDocumentedNamespaces()>0 && showNamespaces;
-    case LayoutNavEntry::NamespaceList:      return index.numDocumentedNamespaces()>0 && showNamespaces;
-    case LayoutNavEntry::NamespaceMembers:   return index.numDocumentedNamespaceMembers(NamespaceMemberHighlight::All)>0;
+    case LayoutNavEntry::Topics:             return index.numDocumentedGroups()>0;
+    case LayoutNavEntry::Modules:            return index.numDocumentedModules()>0;
+    case LayoutNavEntry::ModuleList:         return index.numDocumentedModules()>0;
+    case LayoutNavEntry::ModuleMembers:      return index.numDocumentedModuleMembers(ModuleMemberHighlight::All)>0;
+    case LayoutNavEntry::Namespaces:         return showNamespaces && index.numDocumentedNamespaces()>0;
+    case LayoutNavEntry::NamespaceList:      return showNamespaces && index.numDocumentedNamespaces()>0;
+    case LayoutNavEntry::NamespaceMembers:   return showNamespaces && index.numDocumentedNamespaceMembers(NamespaceMemberHighlight::All)>0;
     case LayoutNavEntry::Concepts:           return index.numDocumentedConcepts()>0;
     case LayoutNavEntry::Classes:            return index.numAnnotatedClasses()>0;
     case LayoutNavEntry::ClassList:          return index.numAnnotatedClasses()>0;
     case LayoutNavEntry::ClassIndex:         return index.numAnnotatedClasses()>0;
     case LayoutNavEntry::ClassHierarchy:     return index.numHierarchyClasses()>0;
     case LayoutNavEntry::ClassMembers:       return index.numDocumentedClassMembers(ClassMemberHighlight::All)>0;
-    case LayoutNavEntry::Files:              return Config_getBool(SHOW_FILES) && index.numDocumentedFiles()>0;
-    case LayoutNavEntry::FileList:           return Config_getBool(SHOW_FILES) && index.numDocumentedFiles()>0;
-    case LayoutNavEntry::FileGlobals:        return Config_getBool(SHOW_FILES) && index.numDocumentedFileMembers(FileMemberHighlight::All)>0;
+    case LayoutNavEntry::Files:              return showFiles && index.numDocumentedFiles()>0;
+    case LayoutNavEntry::FileList:           return showFiles && index.numDocumentedFiles()>0;
+    case LayoutNavEntry::FileGlobals:        return showFiles && index.numDocumentedFileMembers(FileMemberHighlight::All)>0;
     case LayoutNavEntry::Examples:           return !Doxygen::exampleLinkedMap->empty();
     case LayoutNavEntry::Interfaces:         return index.numAnnotatedInterfaces()>0;
     case LayoutNavEntry::InterfaceList:      return index.numAnnotatedInterfaces()>0;
@@ -2723,7 +2759,8 @@ static void renderQuickLinksAsTabs(TextStream &t,const QCString &relPath,
 static void writeDefaultQuickLinks(TextStream &t,bool compact,
                                    HighlightedItem hli,
                                    const QCString &file,
-                                   const QCString &relPath)
+                                   const QCString &relPath,
+                                   bool needsFolding)
 {
   bool serverBasedSearch = Config_getBool(SERVER_BASED_SEARCH);
   bool searchEngine = Config_getBool(SEARCHENGINE);
@@ -2735,7 +2772,8 @@ static void writeDefaultQuickLinks(TextStream &t,bool compact,
   switch (hli) // map HLI enums to LayoutNavEntry::Kind enums
   {
     case HighlightedItem::Main:                kind = LayoutNavEntry::MainPage;         break;
-    case HighlightedItem::Modules:             kind = LayoutNavEntry::Modules;          break;
+    case HighlightedItem::Topics:              kind = LayoutNavEntry::Topics;           break;
+    case HighlightedItem::Modules:             kind = LayoutNavEntry::ModuleList;       altKind = LayoutNavEntry::Modules;     break;
     case HighlightedItem::Namespaces:          kind = LayoutNavEntry::NamespaceList;    altKind = LayoutNavEntry::Namespaces;  break;
     case HighlightedItem::ClassHierarchy:      kind = LayoutNavEntry::ClassHierarchy;   break;
     case HighlightedItem::InterfaceHierarchy:  kind = LayoutNavEntry::InterfaceHierarchy;   break;
@@ -2746,11 +2784,12 @@ static void writeDefaultQuickLinks(TextStream &t,bool compact,
     case HighlightedItem::Structs:             kind = LayoutNavEntry::StructIndex;      altKind = LayoutNavEntry::Structs;     break;
     case HighlightedItem::Exceptions:          kind = LayoutNavEntry::ExceptionIndex;   altKind = LayoutNavEntry::Exceptions;  break;
     case HighlightedItem::AnnotatedClasses:    kind = LayoutNavEntry::ClassList;        altKind = LayoutNavEntry::Classes;     break;
-    case HighlightedItem::AnnotatedInterfaces: kind = LayoutNavEntry::InterfaceList; altKind = LayoutNavEntry::Interfaces;  break;
+    case HighlightedItem::AnnotatedInterfaces: kind = LayoutNavEntry::InterfaceList;    altKind = LayoutNavEntry::Interfaces;  break;
     case HighlightedItem::AnnotatedStructs:    kind = LayoutNavEntry::StructList;       altKind = LayoutNavEntry::Structs;     break;
-    case HighlightedItem::AnnotatedExceptions: kind = LayoutNavEntry::ExceptionList; altKind = LayoutNavEntry::Exceptions;  break;
+    case HighlightedItem::AnnotatedExceptions: kind = LayoutNavEntry::ExceptionList;    altKind = LayoutNavEntry::Exceptions;  break;
     case HighlightedItem::Files:               kind = LayoutNavEntry::FileList;         altKind = LayoutNavEntry::Files;       break;
     case HighlightedItem::NamespaceMembers:    kind = LayoutNavEntry::NamespaceMembers; break;
+    case HighlightedItem::ModuleMembers:       kind = LayoutNavEntry::ModuleMembers;    break;
     case HighlightedItem::Functions:           kind = LayoutNavEntry::ClassMembers;     break;
     case HighlightedItem::Globals:             kind = LayoutNavEntry::FileGlobals;      break;
     case HighlightedItem::Pages:               kind = LayoutNavEntry::Pages;            break;
@@ -2759,6 +2798,8 @@ static void writeDefaultQuickLinks(TextStream &t,bool compact,
     case HighlightedItem::ClassVisible:        kind = LayoutNavEntry::ClassList;        altKind = LayoutNavEntry::Classes;
                                                highlightParent = true; break;
     case HighlightedItem::ConceptVisible:      kind = LayoutNavEntry::Concepts;
+                                               highlightParent = true; break;
+    case HighlightedItem::ModuleVisible:       kind = LayoutNavEntry::ModuleList;       altKind = LayoutNavEntry::Modules;
                                                highlightParent = true; break;
     case HighlightedItem::InterfaceVisible:    kind = LayoutNavEntry::InterfaceList;    altKind = LayoutNavEntry::Interfaces;
                                                highlightParent = true; break;
@@ -2804,8 +2845,8 @@ static void writeDefaultQuickLinks(TextStream &t,bool compact,
       else
       {
         t << "  $(document).ready(function() {\n"
-          << "    if ($('.searchresults').length > 0) { searchBox.DOMSearchField().focus(); }\n"
-          << "  });\n";
+          << "    if ($('.searchresults').length > 0) { searchBox.DOMSearchField().focus(); }\n";
+        t << "  });\n";
       }
     }
     t << "});\n";
@@ -2840,6 +2881,14 @@ static void writeDefaultQuickLinks(TextStream &t,bool compact,
   else
   {
     renderQuickLinksAsTree(t,relPath,root);
+  }
+  if (needsFolding && Config_getBool(HTML_CODE_FOLDING))
+  {
+    t << "<script type=\"text/javascript\">\n";
+    t << "/* @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&amp;dn=expat.txt MIT */\n";
+    t << "$(document).ready(function() { init_codefold(" << (relPath.isEmpty() ? "0" : "1") << "); });\n";
+    t << "/* @license-end */\n";
+    t << "</script>\n";
   }
 }
 
@@ -2914,9 +2963,9 @@ void HtmlGenerator::endPageDoc()
   m_t << "</div><!-- PageDoc -->\n";
 }
 
-void HtmlGenerator::writeQuickLinks(bool compact,HighlightedItem hli,const QCString &file)
+void HtmlGenerator::writeQuickLinks(bool compact,HighlightedItem hli,const QCString &file,bool needsFolding)
 {
-  writeDefaultQuickLinks(m_t,compact,hli,file,m_relPath);
+  writeDefaultQuickLinks(m_t,compact,hli,file,m_relPath,needsFolding);
 }
 
 // PHP based search script
@@ -2976,7 +3025,7 @@ void HtmlGenerator::writeSearchPage()
     t << "</script>\n";
     if (!Config_getBool(DISABLE_INDEX))
     {
-      writeDefaultQuickLinks(t,TRUE,HighlightedItem::Search,QCString(),QCString());
+      writeDefaultQuickLinks(t,true,HighlightedItem::Search,QCString(),QCString(),false);
     }
     else
     {
@@ -3032,7 +3081,7 @@ void HtmlGenerator::writeExternalSearchPage()
     t << "</script>\n";
     if (!Config_getBool(DISABLE_INDEX))
     {
-      writeDefaultQuickLinks(t,TRUE,HighlightedItem::Search,QCString(),QCString());
+      writeDefaultQuickLinks(t,true,HighlightedItem::Search,QCString(),QCString(),false);
       if (!Config_getBool(HTML_DYNAMIC_MENUS)) // for dynamic menus, menu.js creates this part
       {
         t << "            <input type=\"text\" id=\"MSearchField\" name=\"query\" value=\"\" placeholder=\"" << theTranslator->trSearch() <<

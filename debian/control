@@ -3,21 +3,20 @@ Section: devel
 Priority: optional
 Maintainer: Paolo Greppi <paolo.greppi@libpf.com>
 Build-Depends: debhelper-compat (= 13),
-  dpkg-dev (>= 1.17.14),
   qtbase5-dev (>= 5.12.5+dfsg-3) <!stage1>,
-  flex, bison (>= 1.875a),
+  flex, bison,
   python3,
   zlib1g-dev,
-  libxapian-dev (>= 1.2.21-1.2),
+  libxapian-dev,
+  libspdlog-dev,
+  libsqlite3-dev,
+  libfmt-dev,
   cmake,
-  llvm-dev  (>= 1:14.0 ),
-  mlir-14-tools  (>= 1:14.0 ),
-  libclang-dev ,
-  clang ,
+  llvm-dev [amd64 armel armhf arm64 i386 mips mipsel mips64el ppc64 ppc64el riscv64 s390x sparc64],
+  libclang-dev [amd64 armel armhf arm64 i386 mips mipsel mips64el ppc64 ppc64el riscv64 s390x sparc64],
+  clang [amd64 armel armhf arm64 i386 mips mipsel mips64el ppc64 ppc64el riscv64 s390x sparc64],
   sassc,
-  build-essential [riscv64],
-  faketime,
-  mat2
+  faketime
 Build-Depends-Indep: texlive-fonts-recommended,
   texlive-plain-generic,
   texlive-latex-extra,
@@ -26,7 +25,8 @@ Build-Depends-Indep: texlive-fonts-recommended,
   texlive-font-utils,
   ghostscript,
   graphviz,
-  rdfind
+  rdfind,
+  mat2
 Standards-Version: 4.6.1
 Homepage: https://www.doxygen.nl/
 Vcs-Browser: https://salsa.debian.org/debian/doxygen
@@ -35,6 +35,7 @@ Vcs-Git: https://salsa.debian.org/debian/doxygen.git
 Package: doxygen
 Architecture: any
 Multi-Arch: foreign
+Provides: dh-sequence-doxygen
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Suggests: doxygen-latex, doxygen-doc, doxygen-gui, graphviz
 Description: Generate documentation from source code
@@ -78,7 +79,7 @@ Depends: ${misc:Depends}
 Recommends: doxygen
 Section: doc
 Provides: doxygen-docs
-Replaces: doxygen (<< 1.2.14), doxygen-docs
+Replaces: doxygen-docs
 Conflicts: doxygen-docs
 Description: Documentation for doxygen
  Doxygen is a documentation system for C++, C, Objective-C, C#, PHP, Java,
@@ -92,7 +93,6 @@ Package: doxygen-gui
 Architecture: any
 Depends: doxygen, ${shlibs:Depends}, ${misc:Depends}
 Suggests: doxygen-doc
-Replaces: doxygen (<< 1.2.14)
 Build-Profiles: <!stage1>
 Description: GUI configuration tool for doxygen
  Doxygen is a documentation system for C++, C, Objective-C, C#, PHP, Java,

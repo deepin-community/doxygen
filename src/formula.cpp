@@ -31,16 +31,13 @@
 #include "threadpool.h"
 #include "portable.h"
 #include "latexgen.h"
+#include "debug.h"
 
 // TODO: remove these dependencies
 #include "doxygen.h"   // for Doxygen::indexList
 #include "indexlist.h" // for Doxygen::indexList
 
 static int determineInkscapeVersion(const Dir &thisDir);
-
-// Remove the temporary files
-#define RM_TMP_FILES (true)
-//#define RM_TMP_FILES (false)
 
 struct FormulaManager::Private
 {
@@ -187,15 +184,6 @@ void FormulaManager::checkRepositories()
 
 void FormulaManager::createLatexFile(const QCString &fileName,Format format,Mode mode,IntVector &formulasToGenerate)
 {
-  QCString macroFile = Config_getString(FORMULA_MACROFILE);
-  QCString stripMacroFile;
-  if (!macroFile.isEmpty())
-  {
-    FileInfo fi(macroFile.str());
-    macroFile=fi.absFilePath();
-    stripMacroFile = fi.fileName();
-  }
-
   // generate a latex file containing one formula per page.
   QCString texName=fileName+".tex";
   std::ofstream f = Portable::openOutputStream(texName);
@@ -216,11 +204,15 @@ void FormulaManager::createLatexFile(const QCString &fileName,Format format,Mode
 
     writeExtraLatexPackages(t);
     writeLatexSpecialFormulaChars(t);
+
+    QCString macroFile = Config_getString(FORMULA_MACROFILE);
     if (!macroFile.isEmpty())
     {
-      copyFile(macroFile,stripMacroFile);
+      FileInfo fi(macroFile.str());
+      QCString stripMacroFile = fi.fileName();
       t << "\\input{" << stripMacroFile << "}\n";
     }
+
     t << "\\pagestyle{empty}\n";
     t << "\\begin{document}\n";
     for (const auto &formula : p->formulas)
@@ -319,7 +311,7 @@ static bool extractBoundingBox(const QCString &formBase,
     }
     else
     {
-      err("Couldn't extract bounding box from %s_tmp.epsi",qPrint(formBase));
+      err("Couldn't extract bounding box from %s_tmp.epsi\n",qPrint(formBase));
       return false;
     }
     i = eps.find("%%HiResBoundingBox:");
@@ -329,7 +321,7 @@ static bool extractBoundingBox(const QCString &formBase,
     }
     else
     {
-      err("Couldn't extract high resolution bounding box from %s_tmp.epsi",qPrint(formBase));
+      err("Couldn't extract high resolution bounding box from %s_tmp.epsi\n",qPrint(formBase));
       return false;
     }
   }
@@ -441,11 +433,11 @@ static bool updateEPSBoundingBox(const QCString &formBase,
     {
       if (line.rfind("%%BoundingBox",0)==0)
       {
-        epsOut << "%%BoundingBox: " << x1 << " " << y1 << " " << x2 << " " << y2 << "\n";
+        epsOut << "%%BoundingBox: " << std::max(0,x1-1) << " " << std::max(0,y1-1) << " " << (x2+1) << " " << (y2+1) << "\n";
       }
       else if (line.rfind("%%HiResBoundingBox",0)==0)
       {
-        epsOut << "%%HiResBoundingBox: " << x1hi << " " << y1hi << " " << x2hi << " " << y2hi << "\n";
+        epsOut << "%%HiResBoundingBox: " << std::max(0.0,x1hi-1.0) << " " << std::max(0.0,y1hi-1.0) << " " << (x2hi+1.0) << " " << (y2hi+1.0) << "\n";
       }
       else
       {
@@ -468,7 +460,7 @@ static bool createPNG(const QCString &formBase,const QCString &outFile,double sc
 {
   const size_t argsLen = 4096;
   char args[argsLen];
-  qsnprintf(args,argsLen,"-q -dNOSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pnggray -dGraphicsAlphaBits=4 -dTextAlphaBits=4 "
+  qsnprintf(args,argsLen,"-q -dNOSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pngalpha -dGraphicsAlphaBits=4 -dTextAlphaBits=4 "
                "-r%d -sOutputFile=%s %s_tmp_corr.eps",static_cast<int>(scaleFactor*72),qPrint(outFile),qPrint(formBase));
   if (Portable::system(Portable::ghostScriptCommand(),args)!=0)
   {
@@ -593,6 +585,7 @@ void FormulaManager::createFormulasTexFile(Dir &thisDir,Format format,HighDPI hd
           return generateFormula(thisDir,formulaFileName,formula,pageNum,pageIndex,format,hd,mode);
         };
         results.emplace_back(threadPool.queue(processFormula));
+        pageIndex++;
       }
       for (auto &f : results)
       {
@@ -650,9 +643,23 @@ void FormulaManager::generateImages(const QCString &path,Format format,HighDPI h
   }
   std::string oldDir = Dir::currentDirPath();
 
+  QCString macroFile = Config_getString(FORMULA_MACROFILE);
+  QCString stripMacroFile;
+  if (!macroFile.isEmpty())
+  {
+    FileInfo fi(macroFile.str());
+    macroFile=fi.absFilePath();
+    stripMacroFile = fi.fileName();
+  }
+
   // go to the html output directory (i.e. path)
   Dir::setCurrent(d.absPath());
   Dir thisDir;
+
+  if (!macroFile.isEmpty())
+  {
+    copyFile(macroFile,stripMacroFile);
+  }
 
   createFormulasTexFile(thisDir,format,hd,Mode::Light);
   if (Config_getEnum(HTML_COLORSTYLE)!=HTML_COLORSTYLE_t::LIGHT) // all modes other than light need a dark version
@@ -663,7 +670,7 @@ void FormulaManager::generateImages(const QCString &path,Format format,HighDPI h
   }
 
   // clean up temporary files
-  if (RM_TMP_FILES)
+  if (!Debug::isFlagSet(Debug::Formula))
   {
     for (const auto &file : p->tempFiles)
     {
@@ -761,7 +768,7 @@ static int determineInkscapeVersion(const Dir &thisDir)
     {
       return -1;
     }
-    if (RM_TMP_FILES)
+    if (!Debug::isFlagSet(Debug::Formula))
     {
       thisDir.remove(inkscapeVersionFile.str());
     }

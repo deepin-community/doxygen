@@ -41,37 +41,40 @@ class DirDefImpl : public DefinitionMixin<DirDef>
     DirDefImpl(const QCString &path);
     virtual ~DirDefImpl();
 
-    virtual DefType definitionType() const { return TypeDir; }
-    virtual CodeSymbolType codeSymbolType() const { return CodeSymbolType::Default; }
-    virtual QCString getOutputFileBase() const;
-    virtual QCString anchor() const { return QCString(); }
-    virtual bool isLinkableInProject() const;
-    virtual bool isLinkable() const;
-    virtual QCString displayName(bool=TRUE) const { return m_dispName; }
-    virtual const QCString shortName() const { return m_shortName; }
-    virtual void addSubDir(DirDef *subdir);
-    virtual const FileList &getFiles() const { return m_fileList; }
-    virtual void addFile(const FileDef *fd);
-    virtual const DirList &subDirs() const { return m_subdirs; }
-    virtual bool hasSubdirs() const { return !m_subdirs.empty(); }
-    virtual int level() const { return m_level; }
-    virtual DirDef *parent() const { return m_parent; }
-    virtual int dirCount() const { return m_dirCount; }
-    virtual const UsedDirLinkedMap &usedDirs() const { return m_usedDirs; }
-    virtual bool isParentOf(const DirDef *dir) const;
-    virtual bool depGraphIsTrivial() const;
-    virtual QCString shortTitle() const;
-    virtual bool hasDetailedDescription() const;
-    virtual void writeDocumentation(OutputList &ol);
-    virtual void writeTagFile(TextStream &t);
-    virtual void setDiskName(const QCString &name) { m_diskName = name; }
-    virtual void sort();
-    virtual void setParent(DirDef *parent);
-    virtual void setDirCount(int count);
-    virtual void setLevel();
+    virtual DefType definitionType() const override { return TypeDir; }
+    virtual CodeSymbolType codeSymbolType() const override { return CodeSymbolType::Default; }
+    virtual QCString getOutputFileBase() const override;
+    virtual QCString anchor() const override { return QCString(); }
+    virtual bool isLinkableInProject() const override;
+    virtual bool isLinkable() const override;
+    virtual QCString displayName(bool=TRUE) const override { return m_dispName; }
+    virtual const QCString shortName() const override { return m_shortName; }
+    virtual void addSubDir(DirDef *subdir) override;
+    virtual const FileList &getFiles() const override { return m_fileList; }
+    virtual void addFile(const FileDef *fd) override;
+    virtual const DirList &subDirs() const override { return m_subdirs; }
+    virtual bool hasSubdirs() const override { return !m_subdirs.empty(); }
+    virtual int level() const override { return m_level; }
+    virtual DirDef *parent() const override { return m_parent; }
+    virtual int dirCount() const override { return m_dirCount; }
+    virtual const UsedDirLinkedMap &usedDirs() const override { return m_usedDirs; }
+    virtual bool isParentOf(const DirDef *dir) const override;
+    virtual bool depGraphIsTrivial() const override;
+    virtual QCString shortTitle() const override;
+    virtual bool hasDetailedDescription() const override;
+    virtual void writeDocumentation(OutputList &ol) override;
+    virtual void writeTagFile(TextStream &t) override;
+    virtual void setDiskName(const QCString &name) override { m_diskName = name; }
+    virtual void sort() override;
+    virtual void setParent(DirDef *parent) override;
+    virtual void setDirCount(int count) override;
+    virtual void setLevel() override;
     virtual void addUsesDependency(const DirDef *usedDir,const FileDef *srcFd,
-                                   const FileDef *dstFd,bool srcDirect, bool dstDirect);
-    virtual void computeDependencies();
+                                   const FileDef *dstFd,bool srcDirect, bool dstDirect) override;
+    virtual void computeDependencies() override;
+
+    virtual bool hasDirectoryGraph() const override;
+    virtual void enableDirectoryGraph(bool e) override;
 
   public:
     static DirDef *mergeDirectoryInTree(const QCString &path);
@@ -98,6 +101,7 @@ class DirDefImpl : public DefinitionMixin<DirDef>
     int m_level;
     DirDef *m_parent;
     UsedDirLinkedMap m_usedDirs;
+    bool m_hasDirectoryGraph = false;
 };
 
 DirDef *createDirDef(const QCString &path)
@@ -134,6 +138,8 @@ DirDefImpl::DirDefImpl(const QCString &path) : DefinitionMixin(path,1,1,path)
 
   m_level=-1;
   m_parent=0;
+  m_hasDirectoryGraph=Config_getBool(DIRECTORY_GRAPH);
+
 }
 
 DirDefImpl::~DirDefImpl()
@@ -309,7 +315,7 @@ void DirDefImpl::writeBriefDescription(OutputList &ol)
 void DirDefImpl::writeDirectoryGraph(OutputList &ol)
 {
   // write graph dependency graph
-  if (Config_getBool(DIRECTORY_GRAPH) && Config_getBool(HAVE_DOT))
+  if (Config_getBool(HAVE_DOT) && m_hasDirectoryGraph /*&& Config_getBool(DIRECTORY_GRAPH)*/)
   {
     DotDirDeps dirDep(this);
     if (!dirDep.isTrivial())
@@ -439,12 +445,12 @@ void DirDefImpl::writeFileList(OutputList &ol)
         ol.insertMemberAlign();
         if (fd->isLinkable())
         {
-          ol.writeObjectLink(fd->getReference(),fd->getOutputFileBase(),QCString(),fd->name());
+          ol.writeObjectLink(fd->getReference(),fd->getOutputFileBase(),QCString(),fd->displayName());
         }
         else
         {
           ol.startBold();
-          ol.docify(fd->name());
+          ol.docify(fd->displayName());
           ol.endBold();
         }
         ol.endMemberItem(OutputGenerator::MemberItemType::Normal);
@@ -619,6 +625,7 @@ void DirDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::FileInlineClasses:
       case LayoutDocEntry::GroupClasses:
       case LayoutDocEntry::GroupConcepts:
+      case LayoutDocEntry::GroupModules:
       case LayoutDocEntry::GroupInlineClasses:
       case LayoutDocEntry::GroupNamespaces:
       case LayoutDocEntry::GroupDirs:
@@ -626,6 +633,10 @@ void DirDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::GroupFiles:
       case LayoutDocEntry::GroupGraph:
       case LayoutDocEntry::GroupPageDocs:
+      case LayoutDocEntry::ModuleExports:
+      case LayoutDocEntry::ModuleClasses:
+      case LayoutDocEntry::ModuleConcepts:
+      case LayoutDocEntry::ModuleUsedFiles:
       case LayoutDocEntry::AuthorSection:
       case LayoutDocEntry::MemberGroups:
       case LayoutDocEntry::MemberDecl:
@@ -776,7 +787,6 @@ bool DirDefImpl::depGraphIsTrivial() const
   return m_usedDirs.empty() && m_parent==nullptr;
 }
 
-
 //----------------------------------------------------------------------
 
 UsedDir::UsedDir(const DirDef *dir) :
@@ -860,6 +870,16 @@ DirDef *DirDefImpl::mergeDirectoryInTree(const QCString &path)
     p=i+1;
   }
   return dir;
+}
+
+void DirDefImpl::enableDirectoryGraph(bool e)
+{
+  m_hasDirectoryGraph=e;
+}
+
+bool DirDefImpl::hasDirectoryGraph() const
+{
+  return m_hasDirectoryGraph;
 }
 
 //----------------------------------------------------------------------
@@ -1139,7 +1159,7 @@ void generateDirDocs(OutputList &ol)
     dir->writeDocumentation(ol);
     ol.popGeneratorState();
   }
-  if (Config_getBool(DIRECTORY_GRAPH))
+  //if (Config_getBool(DIRECTORY_GRAPH))
   {
     for (const auto &dr : Doxygen::dirRelations)
     {

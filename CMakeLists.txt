@@ -11,7 +11,7 @@
 # Documents produced by Doxygen are derivative works derived from the
 # input used in their production; they are not affected by this license.
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 project(doxygen)
 
 option(build_wizard    "Build the GUI frontend for doxygen." OFF)
@@ -21,11 +21,11 @@ option(build_xmlparser "Automatically update the XML parser modules when updatin
 option(build_search    "Build external search tools (doxysearch and doxyindexer)" OFF)
 option(build_doc       "Build user manual (HTML and PDF)" OFF)
 option(build_doc_chm   "Build user manual (CHM)" OFF)
-option(use_sqlite3     "Add support for sqlite3 output [experimental]." OFF)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     option(use_libc++  "Use libc++ as C++ standard library." ON)
 endif()
 option(use_libclang    "Add support for libclang parsing." OFF)
+option(use_sys_spdlog  "Use system spdlog instead of bundled." OFF)
 option(static_libclang "Link to a statically compiled version of LLVM/libclang." OFF)
 option(win_static      "Link with /MT in stead of /MD on windows" OFF)
 option(enable_console  "Enable that executables on Windows get the CONSOLE bit set for the doxywizard executable [development]"  OFF)
@@ -56,17 +56,16 @@ else()
     set(depfile_supported  "1" CACHE INTERNAL "DEPFILE is supported")
 endif()
 
-set(sqlite3  "0" CACHE INTERNAL "used in settings.h")
 set(clang    "0" CACHE INTERNAL "used in settings.h")
-if (use_sqlite3)
-	set(sqlite3  "1" CACHE INTERNAL "used in settings.h")
-endif()
 
 set(MACOS_VERSION_MIN 10.14)
 if (use_libclang)
 	set(clang    "1" CACHE INTERNAL "used in settings.h")
         find_package(LLVM CONFIG REQUIRED)
         find_package(Clang CONFIG REQUIRED)
+endif()
+if (use_sys_spdlog)
+        find_package(spdlog CONFIG REQUIRED)
 endif()
 if (build_wizard)
     if (force_qt STREQUAL "Qt6")
@@ -88,6 +87,8 @@ if (CMAKE_SYSTEM MATCHES "Darwin")
     find_library(CORESERVICES_LIB CoreServices)
     set(EXTRA_LIBS ${CORESERVICES_LIB})
 endif()
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSQLITE_OMIT_LOAD_EXTENSION=1")
 
 if (WIN32)
     if (MSVC)
@@ -124,6 +125,11 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
    endif()
 endif()
 
+# needed for JavaCC
+set(JAVA_CC_EXTRA_FLAGS "-DJAVACC_CHAR_TYPE=\"unsigned char\"")
+set(CMAKE_CXX_FLAGS       "${CMAKE_CXX_FLAGS}       ${JAVA_CC_EXTRA_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${JAVA_CC_EXTRA_FLAGS}")
+
 if(POLICY CMP0063)
   cmake_policy(SET CMP0063 NEW)
 endif()
@@ -142,7 +148,7 @@ else ()
 endif ()
 
 find_program(DOT NAMES dot)
-find_package(PythonInterp REQUIRED)
+find_package(Python REQUIRED)
 find_package(FLEX REQUIRED)
 if (FLEX_VERSION VERSION_LESS 2.5.37)
   message(SEND_ERROR "Doxygen requires at least flex version 2.5.37 (installed: ${FLEX_VERSION})")
@@ -156,13 +162,6 @@ find_package(Sanitizers)
 
 if ((CMAKE_BUILD_TYPE STREQUAL "Debug") OR enable_lex_debug)
   set(LEX_FLAGS "${LEX_FLAGS} -d")
-endif()
-
-if (sqlite3)
-  find_package(SQLite3 REQUIRED)
-  if (SQLITE3_VERSION VERSION_LESS 3.9.0)
-    message(SEND_ERROR "Doxygen requires at least sqlite3 version 3.9.0 (installed: ${SQLITE3_VERSION})")
-  endif()
 endif()
 
 find_package(Iconv REQUIRED)
@@ -202,6 +201,7 @@ endif()
 
 include(cmake/CompilerWarnings.cmake)
 include(cmake/Coverage.cmake)
+include(cmake/WindowsEncoding.cmake)
 
 add_subdirectory(deps)
 add_subdirectory(libversion)

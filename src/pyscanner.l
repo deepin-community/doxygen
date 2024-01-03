@@ -114,6 +114,8 @@ struct pyscannerYY_state
   bool                    funcParamsEnd = FALSE;
   std::vector<QCString>   decorators;
   QCString                programStr;
+  TextStream              decoratorCommentStr;
+  int                     decoratorRound = 0;
 };
 
 //-----------------------------------------------------------------------------
@@ -145,6 +147,7 @@ static void initSpecialBlock(yyscan_t yyscanner);
 static void searchFoundDef(yyscan_t yyscanner);
 static void searchFoundClass(yyscan_t yyscanner);
 static QCString findPackageScope(yyscan_t yyscanner,const QCString &fileName);
+static void setProtection(yyscan_t yyscanner);
 
 static int yyread(yyscan_t yyscanner,char *buf,int max_size);
 
@@ -183,7 +186,6 @@ NONEMPTYEXP       [^ \t\n:]
 PARAMNONEMPTY     [^ \t\n():]
 IDENTIFIER        ({LETTER}|"_")({LETTER}|{DIGIT}|"_")*
 SCOPE             {IDENTIFIER}("."{IDENTIFIER})*
-CALL              "("[^)]*")"
 BORDER            ([^A-Za-z0-9])
 
 TRISINGLEQUOTE    {STRINGPREFIX}?"'''"(!)?
@@ -255,6 +257,10 @@ STARTDOCSYMS      "##"
 %x FromMod
 %x FromModItem
 %x Import
+
+
+  /* Decorator */
+%x Decorator
 
 %%
 
@@ -364,10 +370,16 @@ STARTDOCSYMS      "##"
                         yyextra->packageCommentAllowed = FALSE;
                         BEGIN( DoubleQuoteString );
                       }
-    "@staticmethod"  {
+    "@staticmethod"   {
                         yyextra->isStatic=TRUE;
                       }
-    "@"{SCOPE}{CALL}? { // decorator
+    "@"{SCOPE}"("     { // decorator
+                        lineCount(yyscanner);
+                        yyextra->decoratorRound = 1;
+                        yyextra->copyString=0;
+                        BEGIN( Decorator );
+                      }
+    "@"{SCOPE}        { // decorator
                         lineCount(yyscanner);
                       }
     {SCRIPTCOMMENT}   { // Unix type script comment
@@ -1038,6 +1050,8 @@ STARTDOCSYMS      "##"
 
                           yyextra->current->section = Entry::CLASS_SEC;
                           yyextra->current->name = yytext;
+                          // we need to set the protectiion based on the "local" class name
+                          setProtection(yyscanner);
 
                           // prepend scope in case of nested classes
                           if (yyextra->current_root->section&Entry::SCOPE_MASK)
@@ -1522,6 +1536,47 @@ STARTDOCSYMS      "##"
                         }
 }
 
+<Decorator>{
+   {TRIDOUBLEQUOTE}     { // start of a comment block
+                          yyextra->doubleQuote=TRUE;
+                          yyextra->decoratorCommentStr.str(std::string());
+                          yyextra->copyString=&yyextra->decoratorCommentStr;
+                          yyextra->stringContext=YY_START;
+                          BEGIN(TripleString);
+                        }
+
+   {TRISINGLEQUOTE}     { // start of a comment block
+                          yyextra->doubleQuote=FALSE;
+                          yyextra->decoratorCommentStr.str(std::string());
+                          yyextra->copyString=&yyextra->decoratorCommentStr;
+                          yyextra->stringContext=YY_START;
+                          BEGIN(TripleString);
+                        }
+   "'"                  {
+                          yyextra->stringContext=YY_START;
+                          yyextra->decoratorCommentStr.str(std::string());
+                          yyextra->copyString=&yyextra->decoratorCommentStr;
+                          BEGIN( SingleQuoteString );
+                        }
+   "\""                 {
+                          yyextra->stringContext=YY_START;
+                          yyextra->decoratorCommentStr.str(std::string());
+                          yyextra->copyString=&yyextra->decoratorCommentStr;
+                          BEGIN( DoubleQuoteString );
+                        }
+    "("                 {
+                          yyextra->decoratorRound++;
+                        }
+    ")"                 {
+                          yyextra->decoratorRound--;
+                          if (!yyextra->decoratorRound) BEGIN( Search );
+                        }
+    \n                  {
+                          incLineNr(yyscanner);
+                        }
+    .                   { }
+}
+              
   /* ------------ End rules -------------- */
 
   /*

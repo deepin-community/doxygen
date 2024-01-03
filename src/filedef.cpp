@@ -49,6 +49,67 @@
 #include "definitionimpl.h"
 #include "conceptdef.h"
 #include "outputlist.h"
+#include "moduledef.h"
+
+//---------------------------------------------------------------------------
+
+QCString includeStatement(SrcLangExt lang,IncludeKind kind)
+{
+  bool isIDLorJava = lang==SrcLangExt_IDL || lang==SrcLangExt_Java;
+  if (isIDLorJava || (kind & IncludeKind_ImportMask))
+  {
+    return "import ";
+  }
+  else if (kind & IncludeKind_ObjCMask)
+  {
+    return "#import ";
+  }
+  else
+  {
+    return "#include ";
+  }
+}
+
+QCString includeOpen(SrcLangExt lang,IncludeKind kind)
+{
+  if (lang==SrcLangExt_Java || kind==IncludeKind::ImportModule) return "";
+  if (kind & IncludeKind_LocalMask)
+  {
+    return "\"";
+  }
+  else
+  {
+    return "<";
+  }
+}
+
+QCString includeClose(SrcLangExt lang,IncludeKind kind)
+{
+  if (lang==SrcLangExt_Java || lang==SrcLangExt_IDL) return ";";
+  switch (kind)
+  {
+    case IncludeKind::ImportLocal:       return "\";";
+    case IncludeKind::ImportLocalObjC:   return "\"";
+    case IncludeKind::IncludeLocal:      return "\"";
+    case IncludeKind::ImportSystem:      return ">;";
+    case IncludeKind::ImportSystemObjC:  return ">";
+    case IncludeKind::IncludeSystem:     return ">";
+    case IncludeKind::ImportModule:      return ";";
+  }
+  return "";
+}
+
+QCString includeTagFileAttributes(SrcLangExt lang,IncludeKind kind)
+{
+  QCString result;
+  bool isIDLorJava = lang==SrcLangExt_IDL || lang==SrcLangExt_Java;
+  result.sprintf("local=\"%s\" import=\"%s\" module=\"%s\" objc=\"%s\"",
+           (kind & IncludeKind_LocalMask)  ? "yes" : "no",
+           (isIDLorJava || (kind & IncludeKind_ImportMask)) ? "yes" : "no",
+           (kind==IncludeKind::ImportModule) ? "yes" : "no",
+           (kind & IncludeKind_ObjCMask) ? "yes" : "no");
+  return result;
+}
 
 //---------------------------------------------------------------------------
 
@@ -62,81 +123,87 @@ class FileDefImpl : public DefinitionMixin<FileDef>
     FileDefImpl(const QCString &p,const QCString &n,const QCString &ref=QCString(),const QCString &dn=QCString());
     virtual ~FileDefImpl();
 
-    virtual DefType definitionType() const { return TypeFile; }
-    virtual CodeSymbolType codeSymbolType() const { return CodeSymbolType::Default; }
-    virtual const QCString &name() const;
+    virtual DefType definitionType() const override { return TypeFile; }
+    virtual CodeSymbolType codeSymbolType() const override { return CodeSymbolType::Default; }
+    virtual const QCString &name() const override;
 
-    virtual QCString displayName(bool=TRUE) const { return name(); }
-    virtual QCString fileName() const { return m_fileName; }
-    virtual QCString getOutputFileBase() const;
-    virtual QCString anchor() const { return QCString(); }
-    virtual QCString getSourceFileBase() const;
-    virtual QCString includeName() const;
-    virtual QCString includeDependencyGraphFileName() const;
-    virtual QCString includedByDependencyGraphFileName() const;
-    virtual QCString absFilePath() const { return m_filePath; }
-    virtual const QCString &docName() const { return m_docname; }
-    virtual bool isSource() const { return m_isSource; }
-    virtual bool isDocumentationFile() const;
-    virtual const Definition *getSourceDefinition(int lineNr) const;
-    virtual const MemberDef *getSourceMember(int lineNr) const;
-    virtual QCString getPath() const { return m_path; }
-    virtual QCString getVersion() const { return m_fileVersion; }
-    virtual bool isLinkableInProject() const;
-    virtual bool isLinkable() const { return isLinkableInProject() || isReference(); }
-    virtual bool isIncluded(const QCString &name) const;
-    virtual PackageDef *packageDef() const { return m_package; }
-    virtual DirDef *getDirDef() const      { return m_dir; }
-    virtual const LinkedRefMap<NamespaceDef> &getUsedNamespaces() const;
-    virtual const LinkedRefMap<ClassDef> &getUsedClasses() const  { return m_usingDeclList; }
-    virtual const IncludeInfoList &includeFileList() const    { return m_includeList; }
-    virtual const IncludeInfoList &includedByFileList() const { return m_includedByList; }
-    virtual void getAllIncludeFilesRecursively(StringVector &incFiles) const;
-    virtual MemberList *getMemberList(MemberListType lt) const;
-    virtual const MemberLists &getMemberLists() const { return m_memberLists; }
-    virtual const MemberGroupList &getMemberGroups() const  { return m_memberGroups; }
-    virtual const NamespaceLinkedRefMap &getNamespaces() const    { return m_namespaces; }
-    virtual const ConceptLinkedRefMap &getConcepts() const        { return m_concepts; }
-    virtual const ClassLinkedRefMap &getClasses() const           { return m_classes; }
-    virtual QCString title() const;
-    virtual bool hasDetailedDescription() const;
-    virtual QCString fileVersion() const;
-    virtual bool subGrouping() const { return m_subGrouping; }
-    virtual void countMembers();
-    virtual int numDocMembers() const;
-    virtual int numDecMembers() const;
-    virtual void addSourceRef(int line,const Definition *d,const MemberDef *md);
-    virtual void writeDocumentation(OutputList &ol);
-    virtual void writeMemberPages(OutputList &ol);
-    virtual void writeQuickMemberLinks(OutputList &ol,const MemberDef *currentMd) const;
-    virtual void writeSummaryLinks(OutputList &ol) const;
-    virtual void writeTagFile(TextStream &t);
-    virtual void writeSourceHeader(OutputList &ol);
-    virtual void writeSourceBody(OutputList &ol,ClangTUParser *clangParser);
-    virtual void writeSourceFooter(OutputList &ol);
-    virtual void parseSource(ClangTUParser *clangParser);
-    virtual void setDiskName(const QCString &name);
-    virtual void insertMember(MemberDef *md);
-    virtual void insertClass(ClassDef *cd);
-    virtual void insertConcept(ConceptDef *cd);
-    virtual void insertNamespace(NamespaceDef *nd);
-    virtual void computeAnchors();
-    virtual void setPackageDef(PackageDef *pd) { m_package=pd; }
-    virtual void setDirDef(DirDef *dd) { m_dir=dd; }
-    virtual void addUsingDirective(NamespaceDef *nd);
-    virtual void addUsingDeclaration(ClassDef *cd);
-    virtual void combineUsingRelations();
-    virtual bool generateSourceFile() const;
-    virtual void sortMemberLists();
-    virtual void addIncludeDependency(const FileDef *fd,const QCString &incName,bool local,bool imported);
-    virtual void addIncludedByDependency(const FileDef *fd,const QCString &incName,bool local,bool imported);
-    virtual void addMembersToMemberGroup();
-    virtual void distributeMemberGroupDocumentation();
-    virtual void findSectionsInDocumentation();
-    virtual void addIncludedUsingDirectives(FileDefSet &visitedFiles);
-    virtual void addListReferences();
+    virtual QCString displayName(bool=TRUE) const override { return localName(); }
+    virtual QCString fileName() const override { return m_fileName; }
+    virtual QCString getOutputFileBase() const override;
+    virtual QCString anchor() const override { return QCString(); }
+    virtual QCString getSourceFileBase() const override;
+    virtual QCString includeName() const override;
+    virtual QCString includeDependencyGraphFileName() const override;
+    virtual QCString includedByDependencyGraphFileName() const override;
+    virtual QCString absFilePath() const override { return m_filePath; }
+    virtual const QCString &docName() const override { return m_docname; }
+    virtual bool isSource() const override { return m_isSource; }
+    virtual bool isDocumentationFile() const override;
+    virtual const Definition *getSourceDefinition(int lineNr) const override;
+    virtual const MemberDef *getSourceMember(int lineNr) const override;
+    virtual QCString getPath() const override { return m_path; }
+    virtual QCString getVersion() const override { return m_fileVersion; }
+    virtual bool isLinkableInProject() const override;
+    virtual bool isLinkable() const override { return isLinkableInProject() || isReference(); }
+    virtual bool isIncluded(const QCString &name) const override;
+    virtual DirDef *getDirDef() const override       { return m_dir; }
+    virtual ModuleDef *getModuleDef() const override { return m_moduleDef; }
+    virtual const LinkedRefMap<NamespaceDef> &getUsedNamespaces() const override;
+    virtual const LinkedRefMap<ClassDef> &getUsedClasses() const override  { return m_usingDeclList; }
+    virtual const IncludeInfoList &includeFileList() const override    { return m_includeList; }
+    virtual const IncludeInfoList &includedByFileList() const override { return m_includedByList; }
+    virtual void getAllIncludeFilesRecursively(StringVector &incFiles) const override;
+    virtual MemberList *getMemberList(MemberListType lt) const override;
+    virtual const MemberLists &getMemberLists() const override { return m_memberLists; }
+    virtual const MemberGroupList &getMemberGroups() const override  { return m_memberGroups; }
+    virtual const NamespaceLinkedRefMap &getNamespaces() const override    { return m_namespaces; }
+    virtual const ConceptLinkedRefMap &getConcepts() const override        { return m_concepts; }
+    virtual const ClassLinkedRefMap &getClasses() const override           { return m_classes; }
+    virtual QCString title() const override;
+    virtual bool hasDetailedDescription() const override;
+    virtual QCString fileVersion() const override;
+    virtual bool subGrouping() const override { return m_subGrouping; }
+    virtual void countMembers() override;
+    virtual int numDocMembers() const override;
+    virtual int numDecMembers() const override;
+    virtual void addSourceRef(int line,const Definition *d,const MemberDef *md) override;
+    virtual void writeDocumentation(OutputList &ol) override;
+    virtual void writeMemberPages(OutputList &ol) override;
+    virtual void writeQuickMemberLinks(OutputList &ol,const MemberDef *currentMd) const override;
+    virtual void writeSummaryLinks(OutputList &ol) const override;
+    virtual void writeTagFile(TextStream &t) override;
+    virtual void writeSourceHeader(OutputList &ol) override;
+    virtual void writeSourceBody(OutputList &ol,ClangTUParser *clangParser) override;
+    virtual void writeSourceFooter(OutputList &ol) override;
+    virtual void parseSource(ClangTUParser *clangParser) override;
+    virtual void setDiskName(const QCString &name) override;
+    virtual void insertMember(MemberDef *md) override;
+    virtual void insertClass(ClassDef *cd) override;
+    virtual void insertConcept(ConceptDef *cd) override;
+    virtual void insertNamespace(NamespaceDef *nd) override;
+    virtual void computeAnchors() override;
+    virtual void setDirDef(DirDef *dd) override { m_dir=dd; }
+    virtual void setModuleDef(ModuleDef *mod) override { m_moduleDef=mod; }
+    virtual void addUsingDirective(NamespaceDef *nd) override;
+    virtual void addUsingDeclaration(ClassDef *cd) override;
+    virtual void combineUsingRelations() override;
+    virtual bool generateSourceFile() const override;
+    virtual void sortMemberLists() override;
+    virtual void addIncludeDependency(const FileDef *fd,const QCString &incName,IncludeKind kind) override;
+    virtual void addIncludedByDependency(const FileDef *fd,const QCString &incName,IncludeKind kind) override;
+    virtual void addMembersToMemberGroup() override;
+    virtual void distributeMemberGroupDocumentation() override;
+    virtual void findSectionsInDocumentation() override;
+    virtual void addIncludedUsingDirectives(FileDefSet &visitedFiles) override;
+    virtual void addListReferences() override;
+
+    virtual bool hasIncludeGraph() const override;
+    virtual bool hasIncludedByGraph() const override;
+    virtual void enableIncludeGraph(bool e) override;
+    virtual void enableIncludedByGraph(bool e) override;
 
   private:
+    void setDiskNameLocal(const QCString &name);
     void acquireFileVersion();
     void addMemberToList(MemberListType lt,MemberDef *md);
     void writeMemberDeclarations(OutputList &ol,MemberListType lt,const QCString &title);
@@ -177,8 +244,8 @@ class FileDefImpl : public DefinitionMixin<FileDef>
     MemberDefLineMap      m_srcMemberMap;
     bool                  m_isSource;
     QCString              m_fileVersion;
-    PackageDef           *m_package;
-    DirDef               *m_dir;
+    DirDef               *m_dir = 0;
+    ModuleDef            *m_moduleDef = 0;
     MemberLists           m_memberLists;
     MemberGroupList       m_memberGroups;
     NamespaceLinkedRefMap m_namespaces;
@@ -188,6 +255,9 @@ class FileDefImpl : public DefinitionMixin<FileDef>
     ClassLinkedRefMap     m_exceptions;
     ConceptLinkedRefMap   m_concepts;
     bool                  m_subGrouping;
+    bool                  m_hasIncludeGraph = false;
+    bool                  m_hasIncludedByGraph = false;
+
 };
 
 std::unique_ptr<FileDef> createFileDef(const QCString &p,const QCString &n,const QCString &ref,const QCString &dn)
@@ -210,8 +280,7 @@ FileDefImpl::FileDefImpl(const QCString &p,const QCString &nm,
   m_filePath=m_path+nm;
   m_fileName=nm;
   setReference(lref);
-  setDiskName(!dn.isEmpty() ? dn : nm);
-  m_package           = 0;
+  setDiskNameLocal(!dn.isEmpty() ? dn : nm);
   m_isSource          = guessSection(nm)==Entry::SOURCE_SEC;
   m_docname           = nm;
   m_dir               = 0;
@@ -219,7 +288,8 @@ FileDefImpl::FileDefImpl(const QCString &p,const QCString &nm,
   {
     m_docname.prepend(stripFromPath(m_path));
   }
-  setLanguage(getLanguageFromFileName(name()));
+  setLanguage(getLanguageFromFileName(
+     Config_getBool(FULL_PATH_NAMES) ? m_fileName : DefinitionMixin::name()));
   acquireFileVersion();
   m_subGrouping=Config_getBool(SUBGROUPING);
 }
@@ -229,7 +299,7 @@ FileDefImpl::~FileDefImpl()
 {
 }
 
-void FileDefImpl::setDiskName(const QCString &name)
+void FileDefImpl::setDiskNameLocal(const QCString &name)
 {
   if (isReference())
   {
@@ -243,6 +313,11 @@ void FileDefImpl::setDiskName(const QCString &name)
     m_inclDepFileName = convertNameToFile(name+"_incl");
     m_inclByDepFileName = convertNameToFile(name+"_dep_incl");
   }
+}
+
+void FileDefImpl::setDiskName(const QCString &name)
+{
+  setDiskNameLocal(name);
 }
 
 /*! Compute the HTML anchor names for all members in the class */
@@ -302,16 +377,11 @@ void FileDefImpl::writeTagFile(TextStream &tagFile)
     const FileDef *fd=ii.fileDef;
     if (fd && fd->isLinkable() && !fd->isReference())
     {
-      bool isIDLorJava = FALSE;
-      SrcLangExt lang = fd->getLanguage();
-      isIDLorJava = lang==SrcLangExt_IDL || lang==SrcLangExt_Java;
-      const char *locStr = (ii.local    || isIDLorJava) ? "yes" : "no";
-      const char *impStr = (ii.imported || isIDLorJava) ? "yes" : "no";
+      QCString attr = includeTagFileAttributes(fd->getLanguage(),ii.kind);
       tagFile << "    <includes id=\""
         << convertToXML(fd->getOutputFileBase()) << "\" "
         << "name=\"" << convertToXML(fd->name()) << "\" "
-        << "local=\"" << locStr << "\" "
-        << "imported=\"" << impStr << "\">"
+        << attr << ">"
         << convertToXML(ii.includeName)
         << "</includes>\n";
     }
@@ -370,7 +440,7 @@ void FileDefImpl::writeTagFile(TextStream &tagFile)
             MemberList * ml = getMemberList(lmd->type);
             if (ml)
             {
-              ml->writeTagFile(tagFile);
+              ml->writeTagFile(tagFile,false,false);
             }
           }
         }
@@ -512,29 +582,10 @@ void FileDefImpl::writeIncludeFiles(OutputList &ol)
     for (const auto &ii : m_includeList)
     {
       const FileDef *fd=ii.fileDef;
-      bool isIDLorJava = FALSE;
-      if (fd)
-      {
-        SrcLangExt lang   = fd->getLanguage();
-        isIDLorJava = lang==SrcLangExt_IDL || lang==SrcLangExt_Java;
-      }
       ol.startTypewriter();
-      if (isIDLorJava) // IDL/Java include
-      {
-        ol.docify("import ");
-      }
-      else if (ii.imported) // Objective-C include
-      {
-        ol.docify("#import ");
-      }
-      else // C/C++ include
-      {
-        ol.docify("#include ");
-      }
-      if (ii.local || isIDLorJava)
-        ol.docify("\"");
-      else
-        ol.docify("<");
+      SrcLangExt lang = fd ? fd->getLanguage() : SrcLangExt_Cpp;
+      ol.docify(::includeStatement(lang,ii.kind));
+      ol.docify(::includeOpen(lang,ii.kind));
       ol.disable(OutputType::Html);
       ol.docify(ii.includeName);
       ol.enableAll();
@@ -551,16 +602,20 @@ void FileDefImpl::writeIncludeFiles(OutputList &ol)
       }
       else
       {
-        ol.docify(ii.includeName);
+        ModuleDef *mod = ModuleManager::instance().getPrimaryInterface(ii.includeName);
+        if (ii.kind==IncludeKind::ImportModule && mod && mod->isLinkable())
+        {
+          ol.writeObjectLink(mod->getReference(),mod->getOutputFileBase(),
+                             QCString(),ii.includeName);
+        }
+        else
+        {
+          ol.docify(ii.includeName);
+        }
       }
 
       ol.enableAll();
-      if (ii.local || isIDLorJava)
-        ol.docify("\"");
-      else
-        ol.docify(">");
-      if (isIDLorJava)
-        ol.docify(";");
+      ol.docify(::includeClose(lang,ii.kind));
       ol.endTypewriter();
       ol.lineBreak();
     }
@@ -570,7 +625,7 @@ void FileDefImpl::writeIncludeFiles(OutputList &ol)
 
 void FileDefImpl::writeIncludeGraph(OutputList &ol)
 {
-  if (Config_getBool(HAVE_DOT) /*&& Config_getBool(INCLUDE_GRAPH)*/)
+  if (Config_getBool(HAVE_DOT) && m_hasIncludeGraph /*&& Config_getBool(INCLUDE_GRAPH)*/)
   {
     //printf("Graph for file %s\n",qPrint(name()));
     DotInclDepGraph incDepGraph(this,FALSE);
@@ -595,7 +650,7 @@ void FileDefImpl::writeIncludeGraph(OutputList &ol)
 
 void FileDefImpl::writeIncludedByGraph(OutputList &ol)
 {
-  if (Config_getBool(HAVE_DOT) /*&& Config_getBool(INCLUDED_BY_GRAPH)*/)
+  if (Config_getBool(HAVE_DOT) && m_hasIncludedByGraph /*&& Config_getBool(INCLUDED_BY_GRAPH)*/)
   {
     //printf("Graph for file %s\n",qPrint(name()));
     DotInclDepGraph incDepGraph(this,TRUE);
@@ -701,7 +756,7 @@ void FileDefImpl::writeMemberGroups(OutputList &ol)
   {
     if (!mg->allMembersInSameSection() || !m_subGrouping)
     {
-      mg->writeDeclarations(ol,0,0,this,0);
+      mg->writeDeclarations(ol,0,0,this,0,0);
     }
   }
 }
@@ -816,14 +871,15 @@ void FileDefImpl::writeDocumentation(OutputList &ol)
       getDirDef()->writeNavigationPath(ol);
       ol.endQuickIndices();
     }
-    QCString pageTitleShort=theTranslator->trFileReference(name());
     startTitle(ol,getOutputFileBase(),this);
     ol.pushGeneratorState();
       ol.disableAllBut(OutputType::Html);
-      ol.parseText(pageTitleShort); // Html only
+      ol.parseText(theTranslator->trFileReference(displayName())); // Html only
       ol.enableAll();
       ol.disable(OutputType::Html);
-      ol.parseText(pageTitle); // other output formats
+      ol.parseText(Config_getBool(FULL_PATH_NAMES) ?  // other output formats
+                   pageTitle :
+                   theTranslator->trFileReference(name()));
     ol.popGeneratorState();
     addGroupListToTitle(ol,this);
     endTitle(ol,getOutputFileBase(),title);
@@ -950,6 +1006,7 @@ void FileDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::ConceptDefinition:
       case LayoutDocEntry::GroupClasses:
       case LayoutDocEntry::GroupConcepts:
+      case LayoutDocEntry::GroupModules:
       case LayoutDocEntry::GroupInlineClasses:
       case LayoutDocEntry::GroupNamespaces:
       case LayoutDocEntry::GroupDirs:
@@ -957,6 +1014,10 @@ void FileDefImpl::writeDocumentation(OutputList &ol)
       case LayoutDocEntry::GroupFiles:
       case LayoutDocEntry::GroupGraph:
       case LayoutDocEntry::GroupPageDocs:
+      case LayoutDocEntry::ModuleExports:
+      case LayoutDocEntry::ModuleClasses:
+      case LayoutDocEntry::ModuleConcepts:
+      case LayoutDocEntry::ModuleUsedFiles:
       case LayoutDocEntry::DirSubDirs:
       case LayoutDocEntry::DirFiles:
       case LayoutDocEntry::DirGraph:
@@ -1057,7 +1118,8 @@ void FileDefImpl::writeSourceHeader(OutputList &ol)
   {
     startFile(ol,getSourceFileBase(),QCString(),pageTitle,HighlightedItem::FileVisible,
         !generateTreeView,
-        !isDocFile && genSourceFile ? QCString() : getOutputFileBase());
+        !isDocFile && genSourceFile ? QCString() : getOutputFileBase(),
+        0,true);
     if (!generateTreeView)
     {
       getDirDef()->writeNavigationPath(ol);
@@ -1069,8 +1131,9 @@ void FileDefImpl::writeSourceHeader(OutputList &ol)
   }
   else
   {
-    startFile(ol,getSourceFileBase(),QCString(),pageTitle,HighlightedItem::FileVisible,FALSE,
-        !isDocFile && genSourceFile ? QCString() : getOutputFileBase());
+    startFile(ol,getSourceFileBase(),QCString(),pageTitle,HighlightedItem::FileVisible,false,
+        !isDocFile && genSourceFile ? QCString() : getOutputFileBase(),
+        0,true);
     startTitle(ol,getSourceFileBase());
     ol.parseText(title);
     endTitle(ol,getSourceFileBase(),QCString());
@@ -1083,6 +1146,11 @@ void FileDefImpl::writeSourceHeader(OutputList &ol)
     ol.startTextLink(getOutputFileBase(),QCString());
     ol.parseText(theTranslator->trGotoDocumentation());
     ol.endTextLink();
+
+    ol.pushGeneratorState();
+    ol.disableAllBut(OutputType::RTF);
+    ol.writeString("\\par\n");
+    ol.popGeneratorState();
   }
 }
 
@@ -1346,13 +1414,13 @@ void FileDefImpl::addUsingDeclaration(ClassDef *cd)
   m_usingDeclList.add(cd->qualifiedName(),cd);
 }
 
-void FileDefImpl::addIncludeDependency(const FileDef *fd,const QCString &incName,bool local,bool imported)
+void FileDefImpl::addIncludeDependency(const FileDef *fd,const QCString &incName,IncludeKind kind)
 {
   //printf("FileDefImpl::addIncludeDependency(%p,%s,%d)\n",fd,incName,local);
   QCString iName = fd ? fd->absFilePath() : incName;
   if (!iName.isEmpty() && m_includeMap.find(iName.str())==m_includeMap.end())
   {
-    m_includeList.emplace_back(fd,incName,local,imported);
+    m_includeList.emplace_back(fd,incName,kind);
     m_includeMap.insert(std::make_pair(iName.str(),&m_includeList.back()));
   }
 }
@@ -1405,14 +1473,13 @@ void FileDefImpl::addIncludedUsingDirectives(FileDefSet &visitedFiles)
 }
 
 
-void FileDefImpl::addIncludedByDependency(const FileDef *fd,const QCString &incName,
-                                      bool local,bool imported)
+void FileDefImpl::addIncludedByDependency(const FileDef *fd,const QCString &incName,IncludeKind kind)
 {
   //printf("FileDefImpl::addIncludedByDependency(%p,%s,%d)\n",fd,incName,local);
   QCString iName = fd ? fd->absFilePath() : incName;
   if (!iName.isEmpty() && m_includedByMap.find(iName.str())==m_includedByMap.end())
   {
-    m_includedByList.emplace_back(fd,incName,local,imported);
+    m_includedByList.emplace_back(fd,incName,kind);
     m_includedByMap.insert(std::make_pair(iName.str(),&m_includedByList.back()));
   }
 }
@@ -1636,11 +1703,11 @@ void FileDefImpl::writeMemberDeclarations(OutputList &ol,MemberListType lt,const
     if (optVhdl) // use specific declarations function
     {
 
-      VhdlDocGen::writeVhdlDeclarations(ml,ol,0,0,this,0);
+      VhdlDocGen::writeVhdlDeclarations(ml,ol,0,0,this,0,0);
     }
     else
     {
-      ml->writeDeclarations(ol,0,0,this,0,title,QCString());
+      ml->writeDeclarations(ol,0,0,this,0,0,title,QCString());
     }
   }
 }
@@ -1723,6 +1790,26 @@ int FileDefImpl::numDecMembers() const
 {
   MemberList *ml = getMemberList(MemberListType_allMembersList);
   return ml ? ml->numDecMembers() : 0;
+}
+
+void FileDefImpl::enableIncludeGraph(bool e)
+{
+  m_hasIncludeGraph=e;
+}
+
+void FileDefImpl::enableIncludedByGraph(bool e)
+{
+  m_hasIncludedByGraph=e;
+}
+
+bool FileDefImpl::hasIncludeGraph() const
+{
+  return m_hasIncludeGraph;
+}
+
+bool FileDefImpl::hasIncludedByGraph() const
+{
+  return m_hasIncludedByGraph;
 }
 
 // -----------------------

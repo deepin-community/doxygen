@@ -30,7 +30,7 @@
 
 static AtomicInt g_num;
 
-Entry::Entry()
+Entry::Entry() : program(static_cast<size_t>(0)), initializer(static_cast<size_t>(0))
 {
   //printf("Entry::Entry(%p)\n",this);
   g_num++;
@@ -65,8 +65,14 @@ Entry::Entry(const Entry &e)
   subGrouping = e.subGrouping;
   callGraph   = e.callGraph;
   callerGraph = e.callerGraph;
+  includeGraph = e.includeGraph;
+  includedByGraph = e.includedByGraph;
+  directoryGraph = e.directoryGraph;
+  collaborationGraph = e.collaborationGraph;
+  groupGraph  = e.groupGraph;
   referencedByRelation = e.referencedByRelation;
   referencesRelation   = e.referencesRelation;
+  exported    = e.exported;
   virt        = e.virt;
   args        = e.args;
   bitfields   = e.bitfields;
@@ -187,6 +193,11 @@ void Entry::reset()
   bool entryCallerGraph = Config_getBool(CALLER_GRAPH);
   bool entryReferencedByRelation = Config_getBool(REFERENCED_BY_RELATION);
   bool entryReferencesRelation   = Config_getBool(REFERENCES_RELATION);
+  bool entryIncludeGraph    = Config_getBool(INCLUDE_GRAPH);
+  bool entryIncludedByGraph = Config_getBool(INCLUDED_BY_GRAPH);
+  bool entryDirectoryGraph  = Config_getBool(DIRECTORY_GRAPH);
+  bool entryCollaborationGraph = Config_getBool(COLLABORATION_GRAPH);
+  bool entryGroupGraph  = Config_getBool(GROUP_GRAPHS);
   //printf("Entry::reset()\n");
   name.resize(0);
   type.resize(0);
@@ -219,8 +230,14 @@ void Entry::reset()
   mGrpId = -1;
   callGraph   = entryCallGraph;
   callerGraph = entryCallerGraph;
+  includeGraph = entryIncludeGraph;
+  includedByGraph = entryIncludedByGraph;
+  directoryGraph = entryDirectoryGraph;
+  collaborationGraph = entryCollaborationGraph;
+  groupGraph = entryGroupGraph;
   referencedByRelation = entryReferencedByRelation;
   referencesRelation   = entryReferencesRelation;
+  exported = false;
   section = EMPTY_SEC;
   mtype   = MethodTypes::Method;
   virt    = Specifier::Normal;

@@ -37,6 +37,16 @@
 #include "datetime.h"
 #include "trace.h"
 #include "anchor.h"
+#include "aliases.h"
+
+#if !ENABLE_DOCPARSER_TRACING
+#undef  AUTO_TRACE
+#undef  AUTO_TRACE_ADD
+#undef  AUTO_TRACE_EXIT
+#define AUTO_TRACE(...)      (void)0
+#define AUTO_TRACE_ADD(...)  (void)0
+#define AUTO_TRACE_EXIT(...) (void)0
+#endif
 
 #define INTERNAL_ASSERT(x) do {} while(0)
 //#define INTERNAL_ASSERT(x) if (!(x)) TRACE("INTERNAL_ASSERT({}) failed retval={:#x}: file={} line={}",#x,retval,__FILE__,__LINE__)
@@ -158,7 +168,7 @@ DocEmoji::DocEmoji(DocParser *parser,DocNodeVariant *parent,const QCString &symN
   m_index = EmojiEntityMapper::instance().symbol2index(m_symName.str());
   if (m_index==-1)
   {
-    warn_doc_error(parser->context.fileName,parser->tokenizer.getLineNr(),"Found unsupported emoji symbol '%s'\n",qPrint(m_symName));
+    warn_doc_error(parser->context.fileName,parser->tokenizer.getLineNr(),"Found unsupported emoji symbol '%s'",qPrint(m_symName));
   }
 }
 
@@ -294,7 +304,7 @@ void DocInclude::parse()
       {
         warn_doc_error(parser()->context.fileName,
                        parser()->tokenizer.getLineNr(),
-                       "block marked with %s for \\snippet should appear twice in file %s, found it %d times\n",
+                       "block marked with %s for \\snippet should appear twice in file %s, found it %d times",
                        qPrint(m_blockId),qPrint(m_file),count);
       }
       break;
@@ -980,7 +990,7 @@ QCString DocLink::parse(bool isJavaLink,bool isXmlLink)
   {
     warn_doc_error(parser()->context.fileName,
                    parser()->tokenizer.getLineNr(),
-                   "Unexpected end of comment while inside link command\n");
+                   "Unexpected end of comment while inside link command");
   }
 endlink:
 
@@ -1132,7 +1142,7 @@ void DocVhdlFlow::parse()
       parser()->errorHandleDefaultToken(thisVariant(),tok,children(),"\\vhdlflow");
     }
   }
-  tok=parser()->tokenizer.lex();
+  parser()->tokenizer.lex();
 
   parser()->tokenizer.setStatePara();
   parser()->handlePendingStyleCommands(thisVariant(),children());
@@ -1264,7 +1274,7 @@ int DocHtmlHeader::parse()
   if (tok==0)
   {
     warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected end of comment while inside"
-           " <h%d> tag\n",m_level);
+           " <h%d> tag",m_level);
   }
 endheader:
   parser()->handlePendingStyleCommands(thisVariant(),children());
@@ -3160,7 +3170,7 @@ void DocPara::handleCite()
   if (tok==0)
   {
     warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"unexpected end of comment block while parsing the "
-        "argument of command %s\n", qPrint("cite"));
+        "argument of command %s", qPrint("cite"));
     return;
   }
   else if (tok!=TK_WORD && tok!=TK_LNKWORD)
@@ -3221,7 +3231,7 @@ void DocPara::handleDoxyConfig()
   if (tok==0)
   {
     warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"unexpected end of comment block while parsing the "
-        "argument of command \\doxyconfig\n");
+        "argument of command \\doxyconfig");
     return;
   }
   else if (tok!=TK_WORD && tok!=TK_LNKWORD)
@@ -3399,7 +3409,7 @@ void DocPara::handleILine()
   int tok = parser()->tokenizer.lex();
   if (tok!=TK_WORD)
   {
-    warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"invalid argument for command '\\iline'\n");
+    warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"invalid argument for command '\\iline'");
     return;
   }
   parser()->tokenizer.setStatePara();
@@ -3600,7 +3610,7 @@ void DocPara::handleInclude(const QCString &cmdName,DocInclude::Type t)
   if (tok==TK_WORD && parser()->context.token->name=="{")
   {
     parser()->tokenizer.setStateOptions();
-    tok=parser()->tokenizer.lex();
+    parser()->tokenizer.lex();
     parser()->tokenizer.setStatePara();
     StringVector optList=split(parser()->context.token->name.str(),",");
     auto contains = [&optList](const char *kw)
@@ -3642,10 +3652,10 @@ void DocPara::handleInclude(const QCString &cmdName,DocInclude::Type t)
   else if (tok==TK_WORD && parser()->context.token->name=="[")
   {
     parser()->tokenizer.setStateBlock();
-    tok=parser()->tokenizer.lex();
+    parser()->tokenizer.lex();
     isBlock = (parser()->context.token->name.stripWhiteSpace() == "block");
     parser()->tokenizer.setStatePara();
-    tok=parser()->tokenizer.lex();
+    parser()->tokenizer.lex();
   }
   else if (tok!=TK_WHITESPACE)
   {
@@ -3697,7 +3707,7 @@ void DocPara::handleInclude(const QCString &cmdName,DocInclude::Type t)
        int count;
        if (!blockId.isEmpty() && (count=inc_text.contains(blockId.data()))!=2)
        {
-          warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"block marked with %s for \\snippet should appear twice in file %s, found it %d times\n",
+          warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"block marked with %s for \\snippet should appear twice in file %s, found it %d times",
             qPrint(blockId),qPrint(fileName),count);
        }
        inc_line = lineBlock(inc_text, blockId);
@@ -3741,7 +3751,7 @@ void DocPara::handleSection(const QCString &cmdName)
   if (tok==0)
   {
     warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"unexpected end of comment block while parsing the "
-        "argument of command %s\n", qPrint(saveCmdName));
+        "argument of command %s", qPrint(saveCmdName));
     return;
   }
   else if (tok!=TK_WORD && tok!=TK_LNKWORD)
@@ -3853,7 +3863,14 @@ int DocPara::handleCommand(const QCString &cmdName, const int tok)
   {
     case CMD_UNKNOWN:
       children().append<DocWord>(parser(),thisVariant(),TK_COMMAND_CHAR(tok) + cmdName);
-      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Found unknown command '%s%s'",TK_COMMAND_CHAR(tok),qPrint(cmdName));
+      if (isAliasCmd(cmdName))
+      {
+        warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Found unexpanded alias '%s%s'. Check if number of arguments passed is correct.",TK_COMMAND_CHAR(tok),qPrint(cmdName));
+      }
+      else
+      {
+        warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Found unknown command '%s%s'",TK_COMMAND_CHAR(tok),qPrint(cmdName));
+      }
       break;
     case CMD_EMPHASIS:
       children().append<DocStyleChange>(parser(),thisVariant(),parser()->context.nodeStack.size(),DocStyleChange::Italic,cmdName,TRUE);
@@ -4078,7 +4095,7 @@ int DocPara::handleCommand(const QCString &cmdName, const int tok)
       {
         DocVerbatim::Type t = DocVerbatim::JavaDocLiteral;
         parser()->tokenizer.setStateILiteralOpt();
-        retval = parser()->tokenizer.lex();
+        parser()->tokenizer.lex();
 
         QCString fullMatch = parser()->context.token->verb;
         int idx = fullMatch.find('{');
@@ -4194,7 +4211,7 @@ int DocPara::handleCommand(const QCString &cmdName, const int tok)
       {
         QCString jarPath = Config_getString(PLANTUML_JAR_PATH);
         parser()->tokenizer.setStatePlantUMLOpt();
-        retval = parser()->tokenizer.lex();
+        parser()->tokenizer.lex();
         QCString fullMatch = parser()->context.token->sectionId;
         QCString sectionId = "";
         int idx = fullMatch.find('{');
@@ -4968,7 +4985,7 @@ int DocPara::handleHtmlStartTag(const QCString &tagName,const HtmlAttribList &ta
       break;
   default:
       // we should not get here!
-      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected start tag %s\n",qPrint(tagName));
+      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected start tag %s",qPrint(tagName));
       ASSERT(0);
       break;
   }
@@ -5102,7 +5119,7 @@ int DocPara::handleHtmlEndTag(const QCString &tagName)
       warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected tag </caption> found");
       break;
     case HTML_BR:
-      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Illegal </br> tag found\n");
+      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Illegal </br> tag found");
       break;
     case HTML_H1:
       warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected tag </h1> found");
@@ -5125,7 +5142,7 @@ int DocPara::handleHtmlEndTag(const QCString &tagName)
     case HTML_IMG:
       break;
     case HTML_HR:
-      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Illegal </hr> tag found\n");
+      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Illegal </hr> tag found");
       break;
     case HTML_A:
       //warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected tag </a> found");
@@ -5169,7 +5186,7 @@ int DocPara::handleHtmlEndTag(const QCString &tagName)
       break;
     default:
       // we should not get here!
-      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected end tag %s\n",qPrint(tagName));
+      warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),"Unexpected end tag %s",qPrint(tagName));
       ASSERT(0);
       break;
   }
@@ -5453,7 +5470,7 @@ reparsetoken:
         break;
       default:
         warn_doc_error(parser()->context.fileName,parser()->tokenizer.getLineNr(),
-            "Found unexpected token (id=%s)\n",DocTokenizer::tokToString(tok));
+            "Found unexpected token (id=%s)",DocTokenizer::tokToString(tok));
         break;
     }
   }
