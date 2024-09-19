@@ -1,3 +1,9 @@
+doxygen (1.9.8+ds-2deepin0) unstable; urgency=medium
+
+  * No source change upload against GCC 12.
+
+ -- Tianyu Chen <sweetyfish@deepin.org>  Thu, 19 Sep 2024 22:45:10 +0800
+
 doxygen (1.9.8+ds-2) unstable; urgency=medium
 
   * Incorporate upstream fix for linking doxyparse to spdlog
